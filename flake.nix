@@ -46,20 +46,3 @@
     );
   };
 }
-      # let
-      #   pkgs = system: inputs.nixpkgs.lib.genAttrs [ "hello" ] (package :
-      #     (pkgsFor "aarch64-darwin").${package}
-      #   );
-      # in
-      # inputs.nixpkgs.lib.genAttrs systems pkgs;
-
-
-    # packages."aarch64-darwin" = inputs.nixpkgs.lib.genAttrs [ "hello" ] (package :
-    #   (pkgsFor "aarch64-darwin").${package}
-    # );
-
-    # packages."aarch64-darwin".hello = (pkgsFor "aarch64-darwin").hello;
-    # devShells."aarch64-darwin".hello = (pkgsFor "aarch64-darwin").hello;
-    # packages."aarch64-darwin".default
-#   };
-# }
