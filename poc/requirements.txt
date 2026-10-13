@@ -1,0 +1,14 @@
+aeventkit==2.1.0
+ib_async==2.1.0
+linkify-it-py==2.2.0
+markdown-it-py==4.2.0
+mdit-py-plugins==0.6.1
+mdurl==0.1.2
+nest-asyncio==1.6.0
+numpy==2.5.4
+platformdirs==4.13.0
+Pygments==2.21.0
+rich==15.0.0
+textual==8.2.8
+typing_extensions==4.16.0
+tzdata==2025.3
