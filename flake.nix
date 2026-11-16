@@ -27,6 +27,8 @@
             pkgs.cargo
             pkgs.clippy
             pkgs.rustfmt
+            pkgs.sqlx-cli
+            pkgs.sqlite
           ];
         };
       }
@@ -43,6 +45,9 @@
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+
+          # Query macros check against the committed .sqlx/ cache, not a live DB.
+          env.SQLX_OFFLINE = "true";
         };
       }
     );

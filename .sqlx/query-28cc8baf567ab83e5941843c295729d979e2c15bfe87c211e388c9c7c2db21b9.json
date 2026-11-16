@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO instruments (symbol, asset_class, currency, exchange, name)\n        VALUES (?, ?, ?, ?, ?)\n        ON CONFLICT (symbol, asset_class, currency) DO UPDATE SET\n            exchange = COALESCE(excluded.exchange, instruments.exchange),\n            name     = COALESCE(excluded.name, instruments.name)\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "28cc8baf567ab83e5941843c295729d979e2c15bfe87c211e388c9c7c2db21b9"
+}

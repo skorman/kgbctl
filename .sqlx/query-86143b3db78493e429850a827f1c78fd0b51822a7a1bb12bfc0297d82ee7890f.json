@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT g.name, p.id AS \"position_id!\"\n            FROM position_groups g\n            JOIN position_group_members m ON m.group_id = g.id\n            JOIN positions p              ON p.instrument_id = m.instrument_id AND p.quantity != 0\n            ORDER BY g.id, p.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "position_groups",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "position_id!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "86143b3db78493e429850a827f1c78fd0b51822a7a1bb12bfc0297d82ee7890f"
+}

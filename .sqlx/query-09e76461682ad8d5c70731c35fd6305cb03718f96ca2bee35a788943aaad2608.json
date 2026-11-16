@@ -1,0 +1,230 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, account_id, instrument_id, broker_order_id,\n                   side AS \"side: OrderSide\", order_type AS \"order_type: OrderType\",\n                   time_in_force, quantity, limit_price, stop_price, filled_quantity,\n                   avg_fill_price, fees_usd, status AS \"status: OrderStatus\",\n                   placed_at AS \"placed_at: DateTime<Utc>\",\n                   updated_at AS \"updated_at: DateTime<Utc>\",\n                   closed_at AS \"closed_at: DateTime<Utc>\", raw\n            FROM orders\n            WHERE status IN ('pending', 'open', 'partially_filled')\n            ORDER BY placed_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "instrument_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "instrument_id"
+          }
+        }
+      },
+      {
+        "name": "broker_order_id",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "broker_order_id"
+          }
+        }
+      },
+      {
+        "name": "side: OrderSide",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "side"
+          }
+        }
+      },
+      {
+        "name": "order_type: OrderType",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "order_type"
+          }
+        }
+      },
+      {
+        "name": "time_in_force",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "time_in_force"
+          }
+        }
+      },
+      {
+        "name": "quantity",
+        "ordinal": 7,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "name": "limit_price",
+        "ordinal": 8,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "limit_price"
+          }
+        }
+      },
+      {
+        "name": "stop_price",
+        "ordinal": 9,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "stop_price"
+          }
+        }
+      },
+      {
+        "name": "filled_quantity",
+        "ordinal": 10,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "filled_quantity"
+          }
+        }
+      },
+      {
+        "name": "avg_fill_price",
+        "ordinal": 11,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "avg_fill_price"
+          }
+        }
+      },
+      {
+        "name": "fees_usd",
+        "ordinal": 12,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "fees_usd"
+          }
+        }
+      },
+      {
+        "name": "status: OrderStatus",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "placed_at: DateTime<Utc>",
+        "ordinal": 14,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "closed_at: DateTime<Utc>",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "closed_at"
+          }
+        }
+      },
+      {
+        "name": "raw",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "raw"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "09e76461682ad8d5c70731c35fd6305cb03718f96ca2bee35a788943aaad2608"
+}

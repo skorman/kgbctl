@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM position_group_members WHERE group_id = ? AND instrument_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d848770680ec23a19c95750d7851580cb0e847cd06adb135d3cab774467e4488"
+}

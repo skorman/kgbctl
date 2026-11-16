@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO fills (order_id, broker_fill_id, quantity, price, fee_usd, executed_at)\n            VALUES (?, ?, ?, ?, ?, ?)\n            ON CONFLICT (order_id, broker_fill_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "b382c7f6e16dd7805b9d590a0cdf5c26659fd2a6f07993ad3d77814ab2801e2c"
+}

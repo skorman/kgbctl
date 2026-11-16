@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT ledger_id, refid, time, type AS entry_type, subtype, asset,\n                   amount, fee, balance, raw\n            FROM kraken_ledger\n            WHERE account_id = ?\n            ORDER BY time, ledger_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "ledger_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "ledger_id"
+          }
+        }
+      },
+      {
+        "name": "refid",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "refid"
+          }
+        }
+      },
+      {
+        "name": "time",
+        "ordinal": 2,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "time"
+          }
+        }
+      },
+      {
+        "name": "entry_type",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "type"
+          }
+        }
+      },
+      {
+        "name": "subtype",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "subtype"
+          }
+        }
+      },
+      {
+        "name": "asset",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "asset"
+          }
+        }
+      },
+      {
+        "name": "amount",
+        "ordinal": 6,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "amount"
+          }
+        }
+      },
+      {
+        "name": "fee",
+        "ordinal": 7,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "fee"
+          }
+        }
+      },
+      {
+        "name": "balance",
+        "ordinal": 8,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "balance"
+          }
+        }
+      },
+      {
+        "name": "raw",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kraken_ledger",
+            "name": "raw"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "29f0afa43739e79260da0a6fcc9deb73c471520589a3376e46504721ea8eeb36"
+}

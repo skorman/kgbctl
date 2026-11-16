@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT MAX(f.executed_at) AS \"executed_at: DateTime<Utc>\"\n            FROM fills f\n            JOIN orders o ON o.id = f.order_id\n            WHERE o.account_id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "executed_at: DateTime<Utc>",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "130f849135ebcbf8cf402e29edc49b2a1f3c6897e8ed96df0b93d491473c49ad"
+}

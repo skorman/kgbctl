@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO kraken_ledger (\n                    ledger_id, account_id, refid, time, type, subtype, asset,\n                    amount, fee, balance, raw)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT (ledger_id) DO NOTHING\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "09f698307dcdcdbf3b209a3cbcfa8ab5f0d0ba5cab06119f335f88222b7d7363"
+}

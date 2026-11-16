@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO accounts (broker, external_id, name, base_currency)\n            VALUES (?, ?, ?, ?)\n            ON CONFLICT (broker, external_id) DO UPDATE SET\n                name          = COALESCE(excluded.name, accounts.name),\n                base_currency = excluded.base_currency\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "933b471532209110894eb901b9cb3905d8eeb0eb1f56664eddbbcd0befde7d4a"
+}

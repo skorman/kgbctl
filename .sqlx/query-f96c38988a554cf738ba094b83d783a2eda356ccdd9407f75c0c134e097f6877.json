@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT i.id, i.symbol, i.asset_class AS \"asset_class: AssetClass\",\n                   i.currency, i.exchange, i.name\n            FROM position_group_members m\n            JOIN instruments i ON i.id = m.instrument_id\n            WHERE m.group_id = ?\n            ORDER BY i.symbol\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "symbol",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "symbol"
+          }
+        }
+      },
+      {
+        "name": "asset_class: AssetClass",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "asset_class"
+          }
+        }
+      },
+      {
+        "name": "currency",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "name": "exchange",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "exchange"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f96c38988a554cf738ba094b83d783a2eda356ccdd9407f75c0c134e097f6877"
+}

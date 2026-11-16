@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT instrument_id FROM instrument_broker_ids WHERE broker = ? AND external_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "instrument_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "instrument_broker_ids",
+            "name": "instrument_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ade3b61b5b43c08166927debb1ab5cd019ac1e7fc25fb9c64de8cdd5b874a81e"
+}

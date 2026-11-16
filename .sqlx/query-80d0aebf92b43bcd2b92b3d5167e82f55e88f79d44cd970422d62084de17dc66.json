@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO position_snapshots (\n            sync_run_id, position_id, taken_at, quantity, avg_cost, market_price,\n            market_value_usd, unrealized_pl_usd, unrealized_pl_pct)\n        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "80d0aebf92b43bcd2b92b3d5167e82f55e88f79d44cd970422d62084de17dc66"
+}

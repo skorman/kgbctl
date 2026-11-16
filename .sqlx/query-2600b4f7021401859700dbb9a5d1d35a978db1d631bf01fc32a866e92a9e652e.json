@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE sync_runs\n            SET finished_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), status = ?, error = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "2600b4f7021401859700dbb9a5d1d35a978db1d631bf01fc32a866e92a9e652e"
+}

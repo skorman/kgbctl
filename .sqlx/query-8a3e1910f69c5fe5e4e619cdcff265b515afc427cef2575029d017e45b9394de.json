@@ -1,0 +1,54 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT name AS \"name!\", value_usd AS \"value_usd?: f64\", cost_usd AS \"cost_usd?: f64\",\n                   pl_usd AS \"pl_usd?: f64\", pl_pct AS \"pl_pct?: f64\"\n            FROM v_group_totals\n            ORDER BY name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "position_groups",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "value_usd?: f64",
+        "ordinal": 1,
+        "type_info": "Float",
+        "origin": "Expression"
+      },
+      {
+        "name": "cost_usd?: f64",
+        "ordinal": 2,
+        "type_info": "Float",
+        "origin": "Expression"
+      },
+      {
+        "name": "pl_usd?: f64",
+        "ordinal": 3,
+        "type_info": "Float",
+        "origin": "Expression"
+      },
+      {
+        "name": "pl_pct?: f64",
+        "ordinal": 4,
+        "type_info": "Float",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "8a3e1910f69c5fe5e4e619cdcff265b515afc427cef2575029d017e45b9394de"
+}

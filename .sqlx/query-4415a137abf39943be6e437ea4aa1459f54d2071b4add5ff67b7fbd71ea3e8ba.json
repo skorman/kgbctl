@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE positions\n        SET quantity = 0, market_value_usd = 0, unrealized_pl_usd = 0,\n            closed_at = ?1, updated_at = ?1, last_sync_run_id = ?2\n        WHERE account_id = ?3 AND quantity != 0 AND last_sync_run_id IS NOT ?2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4415a137abf39943be6e437ea4aa1459f54d2071b4add5ff67b7fbd71ea3e8ba"
+}

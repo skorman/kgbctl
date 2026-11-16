@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO positions (\n            account_id, instrument_id, quantity, avg_cost, cost_basis_usd, market_price,\n            market_value_usd, unrealized_pl_usd, unrealized_pl_pct, realized_pl_usd,\n            opened_at, closed_at, updated_at, last_sync_run_id)\n        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,\n                CASE WHEN ?3 != 0 THEN ?11 END, CASE WHEN ?3 = 0 THEN ?11 END, ?11, ?12)\n        ON CONFLICT (account_id, instrument_id) DO UPDATE SET\n            quantity          = excluded.quantity,\n            avg_cost          = excluded.avg_cost,\n            cost_basis_usd    = excluded.cost_basis_usd,\n            market_price      = excluded.market_price,\n            market_value_usd  = excluded.market_value_usd,\n            unrealized_pl_usd = excluded.unrealized_pl_usd,\n            unrealized_pl_pct = excluded.unrealized_pl_pct,\n            realized_pl_usd   = excluded.realized_pl_usd,\n            opened_at = CASE WHEN positions.quantity = 0 AND excluded.quantity != 0\n                             THEN excluded.updated_at ELSE positions.opened_at END,\n            closed_at = CASE WHEN excluded.quantity = 0\n                             THEN COALESCE(positions.closed_at, excluded.updated_at) END,\n            updated_at        = excluded.updated_at,\n            last_sync_run_id  = excluded.last_sync_run_id\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "08d65d0b991f95851cef811a5758ee5e39b8ec18576e8b5eca8c93c7b07188c3"
+}

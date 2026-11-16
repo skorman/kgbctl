@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO position_group_members (group_id, instrument_id, target_weight)\n            VALUES (?, ?, ?)\n            ON CONFLICT (group_id, instrument_id) DO UPDATE SET target_weight = excluded.target_weight\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "180ba08eb4c4b4c4db8c421827827e8c4cb04e01779f4ee4b870b9a20024a796"
+}
