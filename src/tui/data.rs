@@ -22,12 +22,20 @@ pub struct Holding {
 impl Holding {
     /// Average cost per unit.
     pub fn cost(&self) -> f64 {
-        if self.shares != 0.0 { self.basis / self.shares } else { 0.0 }
+        if self.shares != 0.0 {
+            self.basis / self.shares
+        } else {
+            0.0
+        }
     }
 
     /// Unrealized P/L as a fraction of cost basis.
     pub fn pl_pct(&self) -> f64 {
-        if self.basis != 0.0 { self.value / self.basis - 1.0 } else { 0.0 }
+        if self.basis != 0.0 {
+            self.value / self.basis - 1.0
+        } else {
+            0.0
+        }
     }
 }
 
@@ -48,7 +56,11 @@ impl Totals {
     }
 
     pub fn pl_pct(&self) -> f64 {
-        if self.basis != 0.0 { self.pl() / self.basis } else { 0.0 }
+        if self.basis != 0.0 {
+            self.pl() / self.basis
+        } else {
+            0.0
+        }
     }
 }
 
@@ -110,14 +122,21 @@ impl Snapshot {
             groups_of.entry(*position_id).or_default().push(name);
         }
 
-        let names: Vec<&str> =
-            groups.iter().map(|g| g.name.as_str()).chain([OTHER, CRYPTO]).collect();
+        let names: Vec<&str> = groups
+            .iter()
+            .map(|g| g.name.as_str())
+            .chain([OTHER, CRYPTO])
+            .collect();
         // tab name -> ticker -> holding
         let mut buckets: HashMap<&str, HashMap<&str, Holding>> = HashMap::new();
         let mut sources: Vec<Source> = BROKERS
             .iter()
             .zip(runs)
-            .map(|(&broker, last_run)| Source { broker, totals: Totals::default(), last_run })
+            .map(|(&broker, last_run)| Source {
+                broker,
+                totals: Totals::default(),
+                last_run,
+            })
             .collect();
 
         for p in positions {
@@ -132,15 +151,17 @@ impl Snapshot {
                 Broker::Ibkr => groups_of.get(&p.id).cloned().unwrap_or_else(|| vec![OTHER]),
             };
             for tab in tabs {
-                let h = buckets.entry(tab).or_default().entry(&p.ticker).or_insert_with(|| {
-                    Holding {
+                let h = buckets
+                    .entry(tab)
+                    .or_default()
+                    .entry(&p.ticker)
+                    .or_insert_with(|| Holding {
                         ticker: p.ticker.clone(),
                         value: 0.0,
                         shares: 0.0,
                         basis: 0.0,
                         price: 0.0,
-                    }
-                });
+                    });
                 h.value += value;
                 h.shares += p.quantity;
                 h.basis += basis;
@@ -153,14 +174,20 @@ impl Snapshot {
         let tabs = names
             .into_iter()
             .map(|name| {
-                let mut holdings: Vec<Holding> =
-                    buckets.remove(name).map(|b| b.into_values().collect()).unwrap_or_default();
+                let mut holdings: Vec<Holding> = buckets
+                    .remove(name)
+                    .map(|b| b.into_values().collect())
+                    .unwrap_or_default();
                 holdings.sort_by(|a, b| b.value.total_cmp(&a.value).then(a.ticker.cmp(&b.ticker)));
                 let mut totals = Totals::default();
                 for h in &holdings {
                     totals.add(h.value, h.basis);
                 }
-                Tab { name: name.to_string(), holdings, totals }
+                Tab {
+                    name: name.to_string(),
+                    holdings,
+                    totals,
+                }
             })
             .collect();
 
@@ -168,7 +195,11 @@ impl Snapshot {
         for s in &sources {
             totals.add(s.totals.value, s.totals.basis);
         }
-        Self { tabs, sources, totals }
+        Self {
+            tabs,
+            sources,
+            totals,
+        }
     }
 }
 
@@ -177,7 +208,13 @@ mod tests {
     use super::*;
     use crate::db::{AssetClass, NewInstrument, PositionUpdate};
 
-    fn update(symbol: &str, class: AssetClass, qty: f64, price: f64, avg_cost: f64) -> PositionUpdate {
+    fn update(
+        symbol: &str,
+        class: AssetClass,
+        qty: f64,
+        price: f64,
+        avg_cost: f64,
+    ) -> PositionUpdate {
         PositionUpdate {
             instrument: NewInstrument {
                 symbol: symbol.into(),
@@ -199,9 +236,14 @@ mod tests {
     }
 
     async fn sync(db: &Db, broker: Broker, account: &str, updates: &[PositionUpdate]) {
-        let account = db.upsert_account(broker, account, None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(broker, account, None, "USD")
+            .await
+            .unwrap();
         let run = db.start_sync_run(broker).await.unwrap();
-        db.apply_position_sync(run, account, broker, updates).await.unwrap();
+        db.apply_position_sync(run, account, broker, updates)
+            .await
+            .unwrap();
         db.finish_sync_run_ok(run).await.unwrap();
     }
 
@@ -213,14 +255,31 @@ mod tests {
     async fn buckets_and_aggregates_positions() {
         let db = Db::connect_in_memory().await.unwrap();
         use AssetClass::{Crypto, Stock};
-        sync(&db, Broker::Ibkr, "U1", &[
-            update("NVDA", Stock, 10.0, 100.0, 80.0),
-            update("MP", Stock, 4.0, 50.0, 25.0),
-            update("SPY", Stock, 1.0, 500.0, 400.0),
-        ])
+        sync(
+            &db,
+            Broker::Ibkr,
+            "U1",
+            &[
+                update("NVDA", Stock, 10.0, 100.0, 80.0),
+                update("MP", Stock, 4.0, 50.0, 25.0),
+                update("SPY", Stock, 1.0, 500.0, 400.0),
+            ],
+        )
         .await;
-        sync(&db, Broker::Ibkr, "U2", &[update("NVDA", Stock, 10.0, 100.0, 60.0)]).await;
-        sync(&db, Broker::Kraken, "main", &[update("BTC", Crypto, 0.5, 90000.0, 60000.0)]).await;
+        sync(
+            &db,
+            Broker::Ibkr,
+            "U2",
+            &[update("NVDA", Stock, 10.0, 100.0, 60.0)],
+        )
+        .await;
+        sync(
+            &db,
+            Broker::Kraken,
+            "main",
+            &[update("BTC", Crypto, 0.5, 90000.0, 60000.0)],
+        )
+        .await;
 
         let s = Snapshot::load(&db).await.unwrap();
         let names: Vec<_> = s.tabs.iter().map(|t| t.name.as_str()).collect();
@@ -230,7 +289,13 @@ mod tests {
         let prometheus = tab(&s, "Prometheus");
         assert_eq!(
             prometheus.holdings,
-            [Holding { ticker: "NVDA".into(), value: 2000.0, shares: 20.0, basis: 1400.0, price: 100.0 }]
+            [Holding {
+                ticker: "NVDA".into(),
+                value: 2000.0,
+                shares: 20.0,
+                basis: 1400.0,
+                price: 100.0
+            }]
         );
         assert_eq!(prometheus.holdings[0].cost(), 70.0);
         assert!((prometheus.holdings[0].pl_pct() - (2000.0 / 1400.0 - 1.0)).abs() < 1e-12);
@@ -242,12 +307,24 @@ mod tests {
 
         assert_eq!(tab(&s, OTHER).holdings[0].ticker, "SPY");
         assert_eq!(tab(&s, CRYPTO).holdings[0].ticker, "BTC");
-        assert_eq!(tab(&s, CRYPTO).totals, Totals { value: 45000.0, basis: 30000.0 });
+        assert_eq!(
+            tab(&s, CRYPTO).totals,
+            Totals {
+                value: 45000.0,
+                basis: 30000.0
+            }
+        );
 
         // Source totals count each position once, even when it's in two groups.
         let ibkr = &s.sources[0];
         assert_eq!(ibkr.broker, Broker::Ibkr);
-        assert_eq!(ibkr.totals, Totals { value: 2000.0 + 200.0 + 500.0, basis: 1400.0 + 100.0 + 400.0 });
+        assert_eq!(
+            ibkr.totals,
+            Totals {
+                value: 2000.0 + 200.0 + 500.0,
+                basis: 1400.0 + 100.0 + 400.0
+            }
+        );
         assert!(ibkr.last_run.is_some());
         assert_eq!(s.totals.value, 2700.0 + 45000.0);
     }
@@ -256,16 +333,24 @@ mod tests {
     async fn holdings_sort_by_value_descending() {
         let db = Db::connect_in_memory().await.unwrap();
         use AssetClass::Stock;
-        sync(&db, Broker::Ibkr, "U1", &[
-            update("AMD", Stock, 1.0, 100.0, 100.0),
-            update("NVDA", Stock, 1.0, 300.0, 100.0),
-            update("AVGO", Stock, 1.0, 200.0, 100.0),
-        ])
+        sync(
+            &db,
+            Broker::Ibkr,
+            "U1",
+            &[
+                update("AMD", Stock, 1.0, 100.0, 100.0),
+                update("NVDA", Stock, 1.0, 300.0, 100.0),
+                update("AVGO", Stock, 1.0, 200.0, 100.0),
+            ],
+        )
         .await;
 
         let s = Snapshot::load(&db).await.unwrap();
-        let tickers: Vec<_> =
-            tab(&s, "Prometheus").holdings.iter().map(|h| h.ticker.as_str()).collect();
+        let tickers: Vec<_> = tab(&s, "Prometheus")
+            .holdings
+            .iter()
+            .map(|h| h.ticker.as_str())
+            .collect();
         assert_eq!(tickers, ["NVDA", "AVGO", "AMD"]);
         assert!(s.sources[1].last_run.is_none());
     }

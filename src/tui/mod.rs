@@ -4,6 +4,7 @@
 mod app;
 mod data;
 mod format;
+mod splash;
 mod ui;
 
 use std::time::Duration;
@@ -14,6 +15,7 @@ use tokio::sync::mpsc;
 use crate::db::{Broker, Db};
 use crate::sync::{self, SyncOptions, SyncReport};
 use app::{Action, App};
+use splash::Splash;
 
 const TICK: Duration = Duration::from_millis(100);
 
@@ -39,9 +41,12 @@ async fn event_loop(
         }
     });
 
-    let (sync_tx, mut synced) = mpsc::unbounded_channel::<Vec<(Broker, anyhow::Result<SyncReport>)>>();
+    let (sync_tx, mut synced) =
+        mpsc::unbounded_channel::<Vec<(Broker, anyhow::Result<SyncReport>)>>();
     let mut ticker = tokio::time::interval(TICK);
     let mut app = App::new();
+    app.splash = Splash::new().ok();
+    terminal.draw(|f| ui::draw(f, &mut app))?;
     app.reload(&db).await;
 
     while !app.should_quit {

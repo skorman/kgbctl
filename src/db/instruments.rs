@@ -102,7 +102,15 @@ mod tests {
         assert_eq!(a, b);
 
         db.link_broker_id(Broker::Ibkr, "4815747", a).await.unwrap();
-        assert_eq!(db.resolve_broker_id(Broker::Ibkr, "4815747").await.unwrap(), Some(a));
-        assert_eq!(db.resolve_broker_id(Broker::Kraken, "4815747").await.unwrap(), None);
+        assert_eq!(
+            db.resolve_broker_id(Broker::Ibkr, "4815747").await.unwrap(),
+            Some(a)
+        );
+        assert_eq!(
+            db.resolve_broker_id(Broker::Kraken, "4815747")
+                .await
+                .unwrap(),
+            None
+        );
     }
 }

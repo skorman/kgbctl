@@ -53,6 +53,7 @@ cargo run -- -c tui
 
 | Key | Action |
 | --- | --- |
+| any key | Skip the startup animation |
 | `o` | Overview / Detail |
 | `←` `→` | Prev / Next tab |
 | `↑` `↓` / `j` `k` | Move row |

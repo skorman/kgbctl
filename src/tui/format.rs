@@ -3,7 +3,9 @@
 /// `1234.5` -> `1,234.50` with `decimals` places.
 pub fn grouped(x: f64, decimals: usize) -> String {
     let s = format!("{:.*}", decimals, x.abs());
-    let (int, frac) = s.split_once('.').map_or((s.as_str(), None), |(i, f)| (i, Some(f)));
+    let (int, frac) = s
+        .split_once('.')
+        .map_or((s.as_str(), None), |(i, f)| (i, Some(f)));
     let mut out = String::with_capacity(s.len() + int.len() / 3 + 1);
     if x < 0.0 && s.bytes().any(|b| b.is_ascii_digit() && b != b'0') {
         out.push('-');
@@ -34,7 +36,11 @@ pub fn money(x: f64) -> String {
 
 /// `+$1,234.56` / `-$1,234.56`
 pub fn signed_money(x: f64) -> String {
-    if x >= 0.0 { format!("+{}", money(x)) } else { money(x) }
+    if x >= 0.0 {
+        format!("+{}", money(x))
+    } else {
+        money(x)
+    }
 }
 
 /// Fraction as a signed percentage: `0.0523` -> `+5.23%`.

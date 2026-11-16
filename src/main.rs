@@ -39,7 +39,6 @@ impl From<BrokerArg> for Broker {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct CliArgs {
-
     // Command to run
     #[arg(short, long, value_enum)]
     command: Command,
@@ -79,9 +78,11 @@ struct CliArgs {
 
 fn sync_config(args: &CliArgs) -> Config {
     Config {
-        kraken: args.kraken_api_key.clone().zip(args.kraken_secret_key.clone()).map(
-            |(api_key, secret)| kraken::Config { api_key, secret },
-        ),
+        kraken: args
+            .kraken_api_key
+            .clone()
+            .zip(args.kraken_secret_key.clone())
+            .map(|(api_key, secret)| kraken::Config { api_key, secret }),
         ibkr: ibkr::Config {
             host: args.ibkr_host.clone(),
             port: args.ibkr_port,
@@ -92,7 +93,6 @@ fn sync_config(args: &CliArgs) -> Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-
     let args = CliArgs::parse();
 
     let db = Db::connect(&args.db).await?;

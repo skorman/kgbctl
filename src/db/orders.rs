@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use super::{ts, Db, NewFill, NewOrder, Order, OrderSide, OrderStatus, OrderType};
+use super::{Db, NewFill, NewOrder, Order, OrderSide, OrderStatus, OrderType, ts};
 
 impl Db {
     /// Insert or update an order keyed on `(account_id, broker_order_id)`,
@@ -137,7 +137,10 @@ mod tests {
     #[tokio::test]
     async fn order_upsert_and_fills_round_trip() {
         let db = Db::connect_in_memory().await.unwrap();
-        let account = db.upsert_account(Broker::Kraken, "main", None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(Broker::Kraken, "main", None, "USD")
+            .await
+            .unwrap();
         let btc = db
             .upsert_instrument(&NewInstrument {
                 symbol: "BTC".into(),

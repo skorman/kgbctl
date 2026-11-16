@@ -16,7 +16,15 @@ use crate::db::SyncStatus;
 const PRIMARY: Color = Color::Blue;
 const ZEBRA: Color = Color::Indexed(236);
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-const COLUMNS: [&str; 7] = ["Ticker", "Value ($)", "Shares", "Cost", "Price", "Weight", "% P/L"];
+const COLUMNS: [&str; 7] = [
+    "Ticker",
+    "Value ($)",
+    "Shares",
+    "Cost",
+    "Price",
+    "Weight",
+    "% P/L",
+];
 const KEYS: [(&str, &str); 5] = [
     ("q", "Quit"),
     ("r", "Reload"),
@@ -37,6 +45,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Length(1),
     ])
     .areas(frame.area());
+
+    if let Some(splash) = &mut app.splash {
+        splash.render(frame.area(), frame.buffer_mut());
+        return;
+    }
 
     draw_header(frame, header);
     draw_status(frame, status, app);
@@ -71,7 +84,12 @@ fn draw_status(frame: &mut Frame, area: Rect, app: &App) {
 fn draw_footer(frame: &mut Frame, area: Rect) {
     let mut spans = Vec::new();
     for (key, label) in KEYS {
-        spans.push(Span::raw(format!(" {key} ")).bold().fg(Color::White).bg(PRIMARY));
+        spans.push(
+            Span::raw(format!(" {key} "))
+                .bold()
+                .fg(Color::White)
+                .bg(PRIMARY),
+        );
         spans.push(Span::raw(format!(" {label}  ")));
     }
     frame.render_widget(Line::from(spans), area);
@@ -86,8 +104,16 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &App) {
         Layout::vertical([Constraint::Length(5), Constraint::Fill(1)]).areas(area);
     draw_cards(frame, cards, "Total AUM", app.snapshot.totals, spinner(app));
 
-    let lines: Vec<Line> = app.snapshot.sources.iter().map(|s| source_line(s, app)).collect();
-    let inner = breakdown.inner(ratatui::layout::Margin { horizontal: 2, vertical: 1 });
+    let lines: Vec<Line> = app
+        .snapshot
+        .sources
+        .iter()
+        .map(|s| source_line(s, app))
+        .collect();
+    let inner = breakdown.inner(ratatui::layout::Margin {
+        horizontal: 2,
+        vertical: 1,
+    });
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -103,8 +129,12 @@ fn source_line<'a>(s: &Source, app: &App) -> Line<'a> {
     let t = s.totals;
     let mut spans = vec![
         Span::raw(format!("{label}{:>14}   ", money(t.value))),
-        Span::raw(format!("{} ({})", signed_money(t.pl()), signed_pct(t.pl_pct())))
-            .fg(pl_color(t.pl())),
+        Span::raw(format!(
+            "{} ({})",
+            signed_money(t.pl()),
+            signed_pct(t.pl_pct())
+        ))
+        .fg(pl_color(t.pl())),
     ];
     let when = run.finished_at.unwrap_or(run.started_at);
     let note = match run.status {
@@ -117,7 +147,11 @@ fn source_line<'a>(s: &Source, app: &App) -> Line<'a> {
         ),
     };
     let note = Span::raw(note).dim();
-    spans.push(if run.status == SyncStatus::Error { note.red() } else { note });
+    spans.push(if run.status == SyncStatus::Error {
+        note.red()
+    } else {
+        note
+    });
     Line::from(spans)
 }
 
@@ -135,12 +169,22 @@ fn draw_cards(frame: &mut Frame, area: Rect, value_label: &str, t: Totals, spin:
     let color = pl_color(t.pl());
     let cards = [
         (value_label, money(t.value), Style::new().bold()),
-        ("Total P/L $", signed_money(t.pl()), Style::new().bold().fg(color)),
-        ("Total P/L %", signed_pct(t.pl_pct()), Style::new().bold().fg(color)),
+        (
+            "Total P/L $",
+            signed_money(t.pl()),
+            Style::new().bold().fg(color),
+        ),
+        (
+            "Total P/L %",
+            signed_pct(t.pl_pct()),
+            Style::new().bold().fg(color),
+        ),
     ];
     let areas = Layout::horizontal([Constraint::Fill(1); 3]).split(area);
     for ((label, value, style), &area) in cards.into_iter().zip(areas.iter()) {
-        let block = Block::bordered().border_type(BorderType::Rounded).border_style(PRIMARY);
+        let block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(PRIMARY);
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
@@ -149,7 +193,9 @@ fn draw_cards(frame: &mut Frame, area: Rect, value_label: &str, t: Totals, spin:
             None => label.to_string(),
         };
         let text = Text::from(vec![Line::from(label).dim(), Line::styled(value, style)]);
-        let [middle] = Layout::vertical([Constraint::Length(2)]).flex(Flex::Center).areas(inner);
+        let [middle] = Layout::vertical([Constraint::Length(2)])
+            .flex(Flex::Center)
+            .areas(inner);
         frame.render_widget(Paragraph::new(text).alignment(Alignment::Center), middle);
     }
 }
@@ -179,7 +225,11 @@ fn draw_detail(frame: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn holdings_table(tab: &Tab) -> Table<'static> {
-    let total = if tab.totals.value != 0.0 { tab.totals.value } else { 1.0 };
+    let total = if tab.totals.value != 0.0 {
+        tab.totals.value
+    } else {
+        1.0
+    };
     let rows: Vec<[String; 7]> = tab
         .holdings
         .iter()
@@ -198,25 +248,46 @@ fn holdings_table(tab: &Tab) -> Table<'static> {
 
     let widths: Vec<Constraint> = (0..COLUMNS.len())
         .map(|c| {
-            let w = rows.iter().map(|r| r[c].chars().count()).chain([COLUMNS[c].chars().count()]).max();
+            let w = rows
+                .iter()
+                .map(|r| r[c].chars().count())
+                .chain([COLUMNS[c].chars().count()])
+                .max();
             Constraint::Length(w.unwrap_or(0) as u16)
         })
         .collect();
 
     let align = |c: usize, s: String| -> Line<'static> {
-        if c == 0 { Line::from(s) } else { Line::from(s).right_aligned() }
+        if c == 0 {
+            Line::from(s)
+        } else {
+            Line::from(s).right_aligned()
+        }
     };
-    let header = Row::new(COLUMNS.iter().enumerate().map(|(c, h)| Cell::from(align(c, h.to_string()))))
-        .style(Style::new().bold());
+    let header = Row::new(
+        COLUMNS
+            .iter()
+            .enumerate()
+            .map(|(c, h)| Cell::from(align(c, h.to_string()))),
+    )
+    .style(Style::new().bold());
 
-    let body = rows.into_iter().zip(&tab.holdings).enumerate().map(|(i, (cells, h))| {
-        let pl = h.pl_pct();
-        let row = Row::new(cells.into_iter().enumerate().map(|(c, s)| {
-            let line = align(c, s);
-            Cell::from(if c == 6 { line.fg(pl_color(pl)) } else { line })
-        }));
-        if i % 2 == 1 { row.style(Style::new().bg(ZEBRA)) } else { row }
-    });
+    let body = rows
+        .into_iter()
+        .zip(&tab.holdings)
+        .enumerate()
+        .map(|(i, (cells, h))| {
+            let pl = h.pl_pct();
+            let row = Row::new(cells.into_iter().enumerate().map(|(c, s)| {
+                let line = align(c, s);
+                Cell::from(if c == 6 { line.fg(pl_color(pl)) } else { line })
+            }));
+            if i % 2 == 1 {
+                row.style(Style::new().bg(ZEBRA))
+            } else {
+                row
+            }
+        });
 
     Table::new(body, widths)
         .header(header)

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqliteConnection;
 
-use super::{instruments, ts, AssetClass, Broker, Db, PositionUpdate, PositionView};
+use super::{AssetClass, Broker, Db, PositionUpdate, PositionView, instruments, ts};
 
 impl Db {
     /// Write one broker's full position report for `account_id`, atomically:
@@ -158,7 +158,13 @@ mod tests {
     use super::*;
     use crate::db::NewInstrument;
 
-    fn stock(symbol: &str, con_id: &str, quantity: f64, price: f64, avg_cost: f64) -> PositionUpdate {
+    fn stock(
+        symbol: &str,
+        con_id: &str,
+        quantity: f64,
+        price: f64,
+        avg_cost: f64,
+    ) -> PositionUpdate {
         PositionUpdate {
             instrument: NewInstrument {
                 symbol: symbol.into(),
@@ -181,7 +187,9 @@ mod tests {
 
     async fn sync(db: &Db, account_id: i64, updates: &[PositionUpdate]) -> i64 {
         let run = db.start_sync_run(Broker::Ibkr).await.unwrap();
-        db.apply_position_sync(run, account_id, Broker::Ibkr, updates).await.unwrap();
+        db.apply_position_sync(run, account_id, Broker::Ibkr, updates)
+            .await
+            .unwrap();
         db.finish_sync_run_ok(run).await.unwrap();
         run
     }
@@ -193,7 +201,10 @@ mod tests {
     #[tokio::test]
     async fn repeated_syncs_upsert_positions_and_append_snapshots() {
         let db = Db::connect_in_memory().await.unwrap();
-        let account = db.upsert_account(Broker::Ibkr, "U1", None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
 
         sync(&db, account, &[stock("NVDA", "1", 10.0, 100.0, 80.0)]).await;
         sync(&db, account, &[stock("NVDA", "1", 12.0, 110.0, 82.0)]).await;
@@ -202,24 +213,38 @@ mod tests {
         assert_eq!(positions.len(), 1);
         assert_eq!(positions[0].ticker, "NVDA");
         assert_eq!(positions[0].quantity, 12.0);
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM position_snapshots").await, 2);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) FROM position_snapshots").await,
+            2
+        );
     }
 
     #[tokio::test]
     async fn positions_missing_from_a_sync_are_closed() {
         let db = Db::connect_in_memory().await.unwrap();
-        let account = db.upsert_account(Broker::Ibkr, "U1", None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
 
         sync(
             &db,
             account,
-            &[stock("NVDA", "1", 10.0, 100.0, 80.0), stock("AMD", "2", 5.0, 150.0, 120.0)],
+            &[
+                stock("NVDA", "1", 10.0, 100.0, 80.0),
+                stock("AMD", "2", 5.0, 150.0, 120.0),
+            ],
         )
         .await;
         sync(&db, account, &[stock("NVDA", "1", 10.0, 101.0, 80.0)]).await;
 
-        let tickers: Vec<_> =
-            db.list_positions().await.unwrap().into_iter().map(|p| p.ticker).collect();
+        let tickers: Vec<_> = db
+            .list_positions()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|p| p.ticker)
+            .collect();
         assert_eq!(tickers, ["NVDA"]);
 
         let closed: Option<String> = sqlx::query_scalar(
@@ -235,13 +260,19 @@ mod tests {
     #[tokio::test]
     async fn group_totals_sum_open_positions() {
         let db = Db::connect_in_memory().await.unwrap();
-        let account = db.upsert_account(Broker::Ibkr, "U1", None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
 
         // NVDA and AMD are both seeded members of Prometheus.
         sync(
             &db,
             account,
-            &[stock("NVDA", "1", 10.0, 100.0, 80.0), stock("AMD", "2", 5.0, 150.0, 120.0)],
+            &[
+                stock("NVDA", "1", 10.0, 100.0, 80.0),
+                stock("AMD", "2", 5.0, 150.0, 120.0),
+            ],
         )
         .await;
 
@@ -258,19 +289,34 @@ mod tests {
     #[tokio::test]
     async fn group_position_ids_lists_each_group_a_position_is_in() {
         let db = Db::connect_in_memory().await.unwrap();
-        let account = db.upsert_account(Broker::Ibkr, "U1", None, "USD").await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
 
         // MP is seeded in Zeus and Gaia; SPY is in no group.
         sync(
             &db,
             account,
-            &[stock("MP", "1", 10.0, 50.0, 40.0), stock("SPY", "2", 1.0, 500.0, 400.0)],
+            &[
+                stock("MP", "1", 10.0, 50.0, 40.0),
+                stock("SPY", "2", 1.0, 500.0, 400.0),
+            ],
         )
         .await;
 
-        let mp = db.list_positions().await.unwrap().into_iter().find(|p| p.ticker == "MP").unwrap();
+        let mp = db
+            .list_positions()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.ticker == "MP")
+            .unwrap();
         let ids = db.group_position_ids().await.unwrap();
-        assert_eq!(ids, [("Zeus".to_string(), mp.id), ("Gaia".to_string(), mp.id)]);
+        assert_eq!(
+            ids,
+            [("Zeus".to_string(), mp.id), ("Gaia".to_string(), mp.id)]
+        );
     }
 
     #[tokio::test]
@@ -280,6 +326,9 @@ mod tests {
             .execute(&db.pool)
             .await
             .unwrap_err();
-        assert!(err.as_database_error().is_some_and(|e| e.is_check_violation()));
+        assert!(
+            err.as_database_error()
+                .is_some_and(|e| e.is_check_violation())
+        );
     }
 }

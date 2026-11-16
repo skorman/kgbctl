@@ -5,9 +5,12 @@ use super::{Broker, Db, SyncRun, SyncStatus};
 impl Db {
     /// Record the start of a sync attempt; returns the run id.
     pub async fn start_sync_run(&self, broker: Broker) -> sqlx::Result<i64> {
-        sqlx::query_scalar!("INSERT INTO sync_runs (broker) VALUES (?) RETURNING id", broker)
-            .fetch_one(&self.pool)
-            .await
+        sqlx::query_scalar!(
+            "INSERT INTO sync_runs (broker) VALUES (?) RETURNING id",
+            broker
+        )
+        .fetch_one(&self.pool)
+        .await
     }
 
     pub async fn finish_sync_run_ok(&self, id: i64) -> sqlx::Result<()> {
@@ -15,7 +18,8 @@ impl Db {
     }
 
     pub async fn finish_sync_run_err(&self, id: i64, error: &str) -> sqlx::Result<()> {
-        self.finish_sync_run(id, SyncStatus::Error, Some(error)).await
+        self.finish_sync_run(id, SyncStatus::Error, Some(error))
+            .await
     }
 
     async fn finish_sync_run(

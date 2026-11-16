@@ -52,8 +52,14 @@ mod tests {
     async fn upsert_account_is_idempotent() {
         let db = Db::connect_in_memory().await.unwrap();
 
-        let a = db.upsert_account(Broker::Ibkr, "U1234567", Some("Main"), "USD").await.unwrap();
-        let b = db.upsert_account(Broker::Ibkr, "U1234567", None, "USD").await.unwrap();
+        let a = db
+            .upsert_account(Broker::Ibkr, "U1234567", Some("Main"), "USD")
+            .await
+            .unwrap();
+        let b = db
+            .upsert_account(Broker::Ibkr, "U1234567", None, "USD")
+            .await
+            .unwrap();
         assert_eq!(a, b);
 
         let accounts = db.list_accounts().await.unwrap();

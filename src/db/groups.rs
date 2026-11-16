@@ -121,7 +121,13 @@ mod tests {
     async fn migrations_seed_groups() {
         let db = Db::connect_in_memory().await.unwrap();
 
-        let names: Vec<_> = db.list_groups().await.unwrap().into_iter().map(|g| g.name).collect();
+        let names: Vec<_> = db
+            .list_groups()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|g| g.name)
+            .collect();
         assert_eq!(names, ["Zeus", "Ares", "Prometheus", "Gaia"]);
 
         let zeus = db.find_group("zeus").await.unwrap().unwrap();
@@ -146,8 +152,13 @@ mod tests {
             .find(|i| i.symbol == "NVDA")
             .unwrap();
 
-        db.add_group_member(gaia.id, nvda.id, Some(0.1)).await.unwrap();
-        assert_eq!(db.group_members(gaia.id).await.unwrap().len(), before.len() + 1);
+        db.add_group_member(gaia.id, nvda.id, Some(0.1))
+            .await
+            .unwrap();
+        assert_eq!(
+            db.group_members(gaia.id).await.unwrap().len(),
+            before.len() + 1
+        );
 
         db.remove_group_member(gaia.id, nvda.id).await.unwrap();
         assert_eq!(db.group_members(gaia.id).await.unwrap(), before);

@@ -5,6 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::widgets::TableState;
 
 use super::data::{BROKERS, Snapshot};
+use super::splash::Splash;
 use crate::db::{Broker, Db};
 use crate::sync::SyncReport;
 
@@ -34,6 +35,8 @@ pub struct App {
     pub frame: usize,
     pub error: Option<String>,
     pub should_quit: bool,
+    /// Startup animation; shown instead of the dashboard until it finishes.
+    pub splash: Option<Splash>,
     loaded_at: Instant,
 }
 
@@ -48,6 +51,7 @@ impl App {
             frame: 0,
             error: None,
             should_quit: false,
+            splash: None,
             loaded_at: Instant::now(),
         }
     }
@@ -61,7 +65,8 @@ impl App {
     }
 
     fn set_snapshot(&mut self, snapshot: Snapshot) {
-        self.tables.resize_with(snapshot.tabs.len(), TableState::default);
+        self.tables
+            .resize_with(snapshot.tabs.len(), TableState::default);
         for (table, tab) in self.tables.iter_mut().zip(&snapshot.tabs) {
             let n = tab.holdings.len();
             let selected = table.selected().map(|i| i.min(n.saturating_sub(1)));
@@ -73,6 +78,9 @@ impl App {
 
     /// Advance the spinner; true when it's time for an automatic reload.
     pub fn tick(&mut self) -> bool {
+        if self.splash.as_ref().is_some_and(Splash::done) {
+            self.splash = None;
+        }
         if !self.syncing.is_empty() {
             self.frame = self.frame.wrapping_add(1);
         }
@@ -99,6 +107,10 @@ impl App {
 
     pub fn on_key(&mut self, key: KeyEvent) -> Action {
         if key.kind != KeyEventKind::Press {
+            return Action::None;
+        }
+        // Any key skips the splash; q still quits.
+        if self.splash.take().is_some() && key.code != KeyCode::Char('q') {
             return Action::None;
         }
         match key.code {
@@ -136,7 +148,11 @@ impl App {
         if self.view != View::Detail {
             return;
         }
-        let n = self.snapshot.tabs.get(self.tab).map_or(0, |t| t.holdings.len());
+        let n = self
+            .snapshot
+            .tabs
+            .get(self.tab)
+            .map_or(0, |t| t.holdings.len());
         if let (Some(table), true) = (self.tables.get_mut(self.tab), n > 0) {
             let i = table.selected().unwrap_or(0) as isize;
             let next = i.saturating_add(step).clamp(0, n as isize - 1);
