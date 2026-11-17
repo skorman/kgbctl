@@ -108,6 +108,19 @@ Errors are `{"error": {"code", "message"}}` with status 400, 401, 404 or 500.
 curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/snapshot | jq
 ```
 
+## Web app
+
+A React + Vite frontend in `web/` with everything the TUI shows (overview cards, per-broker breakdown and sync status, one tab per KGB ETF with the holdings table) plus charts: allocation by broker and by ETF, portfolio value over time (built from position snapshots), unrealized P/L per holding, and per-position price / value / P/L history. It also lists raw positions per account, groups and their members, open orders, sync runs, and accounts, and can rotate your API token.
+
+```sh
+cargo run -- -c serve                 # API on :8080 (needs at least one user, see above)
+cd web && npm install && npm run dev  # UI on http://localhost:5173
+```
+
+Sign in with a token from `kgbctl -c user-add`. The dev server proxies `/api` to `http://127.0.0.1:8080`, so the browser only talks to one origin; set `VITE_API_PROXY` in `web/.env.local` to proxy to another backend instead (for example the Pi's tunnel hostname), or `VITE_API_BASE` to have the browser call a host directly (then start the server with `--cors-origin`). `npm run build` writes a static site to `web/dist/`.
+
+The startup animation is `assets/kgb_horse_loading_animation.gif`, same as the TUI; any key skips it. Keys mirror the TUI: `o` overview/detail, `←`/`→` previous/next ETF, `↑`/`↓` or `j`/`k` move row, `r` reload, `t` theme (dark, light, system). Data reloads every 30 seconds.
+
 ### Raspberry Pi
 
 Build for 64-bit ARM Linux, either natively on the Pi with `nix build .#packages.aarch64-linux.default`, or cross-compiled with `SQLX_OFFLINE=true cargo zigbuild --release --target aarch64-unknown-linux-gnu`. Then follow the steps at the top of `deploy/kgbctl.service` to install the binary and the systemd unit.
