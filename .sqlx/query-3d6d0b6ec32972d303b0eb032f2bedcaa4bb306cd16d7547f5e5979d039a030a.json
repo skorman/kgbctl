@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE api_users SET token_hash = ? WHERE id = ? AND token_hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "3d6d0b6ec32972d303b0eb032f2bedcaa4bb306cd16d7547f5e5979d039a030a"
+}

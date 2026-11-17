@@ -46,6 +46,25 @@ impl Db {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Swap user `id`'s token from `old_hash` to `new_hash`. Returns false if the
+    /// token no longer matches, e.g. a concurrent rotation already replaced it.
+    pub async fn rotate_api_user_token(
+        &self,
+        id: i64,
+        old_hash: &str,
+        new_hash: &str,
+    ) -> sqlx::Result<bool> {
+        let result = sqlx::query!(
+            "UPDATE api_users SET token_hash = ? WHERE id = ? AND token_hash = ?",
+            new_hash,
+            id,
+            old_hash,
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Returns false if there's no such user.
     pub async fn delete_api_user(&self, name: &str) -> sqlx::Result<bool> {
         let result = sqlx::query!("DELETE FROM api_users WHERE name = ?", name)
@@ -109,6 +128,12 @@ mod tests {
         assert!(db.authenticate_api_user("old").await.unwrap().is_none());
         assert!(db.authenticate_api_user("new").await.unwrap().is_some());
         assert!(!db.set_api_user_token("nobody", "x").await.unwrap());
+
+        let id = db.list_api_users().await.unwrap()[0].id;
+        assert!(!db.rotate_api_user_token(id, "old", "newer").await.unwrap());
+        assert!(db.rotate_api_user_token(id, "new", "newer").await.unwrap());
+        assert!(db.authenticate_api_user("new").await.unwrap().is_none());
+        assert!(db.set_api_user_token("sam", "new").await.unwrap());
 
         assert!(db.delete_api_user("Sam").await.unwrap());
         assert!(!db.delete_api_user("Sam").await.unwrap());

@@ -6,11 +6,20 @@ use axum::response::Response;
 use super::error::ApiError;
 use super::{AppState, token};
 
+/// The authenticated user, available to handlers as `Extension<Caller>`.
+#[derive(Clone, Debug)]
+pub struct Caller {
+    pub id: i64,
+    pub name: String,
+    /// Hash of the token this request was made with.
+    pub token_hash: String,
+}
+
 /// Require `Authorization: Bearer <token>` matching an `api_users` row. Records
 /// the user on the request's log span and as their latest activity.
 pub async fn require_user(
     State(state): State<AppState>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
     let Some(hash) = req
@@ -28,5 +37,10 @@ pub async fn require_user(
         return Err(ApiError::Unauthorized);
     };
     tracing::Span::current().record("user", user.name.as_str());
+    req.extensions_mut().insert(Caller {
+        id: user.id,
+        name: user.name,
+        token_hash: hash,
+    });
     Ok(next.run(req).await)
 }

@@ -65,7 +65,7 @@ The database path defaults to `var/kgb.db`. To use a different file, pass `--db 
 
 ## Server
 
-A read-only JSON API over the same data the TUI shows. It serves what's in the database and never contacts a broker.
+A JSON API over the same data the TUI shows. It serves what's in the database and never contacts a broker. The only thing a client can change is its own token.
 
 ```sh
 cargo run -- -c serve                          # listens on 0.0.0.0:8080
@@ -77,6 +77,7 @@ Every request except `/health` needs a bearer token belonging to an API user. Ea
 cargo run -- -c user-add --name Sam        # prints Sam's token
 cargo run -- -c user-list                  # names and last activity
 cargo run -- -c user-rotate --name Sam     # issue a new token; the old one stops working
+                                           # (or the user can call POST /api/v1/token/rotate)
 cargo run -- -c user-remove --name Sam
 ```
 
@@ -86,7 +87,7 @@ cargo run -- -c user-remove --name Sam
 | `--cors-origin <url>` | any origin | Restrict browser origins; repeat for several |
 | `RUST_LOG` | `kgbctl=info,tower_http=info` | Log filter |
 
-All endpoints are `GET` under `/api/v1`. Money is in USD; percentages are fractions (`0.0523` = +5.23%); timestamps are RFC 3339 UTC.
+All endpoints are under `/api/v1` and are `GET` unless noted. Money is in USD; percentages are fractions (`0.0523` = +5.23%); timestamps are RFC 3339 UTC.
 
 | Endpoint | Returns |
 | --- | --- |
@@ -99,6 +100,7 @@ All endpoints are `GET` under `/api/v1`. Money is in USD; percentages are fracti
 | `/groups`, `/groups/{name}` | Groups with totals (`null` if nothing held); one group's members |
 | `/orders/open` | Working orders |
 | `/sync/runs?broker=&limit=` | Sync attempts, newest first (`limit` defaults to 50, max 500) |
+| `POST /token/rotate` | `{name, token}`: a new token for the caller. The token used for the request stops working immediately |
 
 Errors are `{"error": {"code", "message"}}` with status 400, 401, 404 or 500.
 

@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 
-use axum::Json;
 use axum::extract::rejection::{PathRejection, QueryRejection};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::http::header::CACHE_CONTROL;
+use axum::response::IntoResponse;
+use axum::{Extension, Json};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-use super::AppState;
+use super::auth::Caller;
 use super::dto::*;
 use super::error::ApiError;
+use super::{AppState, token};
 use crate::db::{Account, Broker, PositionSnapshot, PositionView, SyncRun};
 use crate::portfolio::Snapshot;
 
@@ -52,6 +55,30 @@ pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<HealthDt
             )
         }
     }
+}
+
+/// Replace the caller's token with a fresh one and return it. The token the
+/// request was made with stops working immediately.
+pub async fn rotate_token(
+    State(state): State<AppState>,
+    Extension(caller): Extension<Caller>,
+) -> Result<impl IntoResponse, ApiError> {
+    let new = token::generate()?;
+    let rotated = state
+        .db
+        .rotate_api_user_token(caller.id, &caller.token_hash, &token::hash(&new))
+        .await?;
+    if !rotated {
+        // Another request rotated (or an admin replaced) this token first.
+        return Err(ApiError::Unauthorized);
+    }
+    tracing::info!("rotated API token");
+    let body = RotatedTokenDto {
+        name: caller.name,
+        token: new,
+    };
+    // The body is a credential; keep it out of any cache.
+    Ok(([(CACHE_CONTROL, "no-store")], Json(body)))
 }
 
 pub async fn snapshot(State(state): State<AppState>) -> ApiResult<SnapshotDto> {

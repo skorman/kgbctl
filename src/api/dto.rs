@@ -19,6 +19,13 @@ pub struct HealthDto {
 }
 
 #[derive(Serialize)]
+pub struct RotatedTokenDto {
+    pub name: String,
+    /// The caller's new token; the one used for the request no longer works.
+    pub token: String,
+}
+
+#[derive(Serialize)]
 pub struct TotalsDto {
     pub value: f64,
     pub basis: f64,

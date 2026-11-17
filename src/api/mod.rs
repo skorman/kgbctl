@@ -1,5 +1,5 @@
-//! Read-only HTTP API over the database, for frontends other than the TUI.
-//! Serves what's already stored; it never contacts a broker.
+//! HTTP API over the database, for frontends other than the TUI. Read-only
+//! apart from token rotation; it never contacts a broker.
 
 mod auth;
 mod dto;
@@ -16,7 +16,7 @@ use axum::extract::Request;
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
 use axum::http::{HeaderValue, Method};
 use axum::middleware;
-use axum::routing::get;
+use axum::routing::{get, post};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -52,6 +52,7 @@ pub fn router(db: Db) -> Router {
         .route("/groups/{name}", get(routes::group))
         .route("/orders/open", get(routes::open_orders))
         .route("/sync/runs", get(routes::sync_runs))
+        .route("/token/rotate", post(routes::rotate_token))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_user,
@@ -76,7 +77,7 @@ fn cors(origins: &[String]) -> anyhow::Result<CorsLayer> {
         AllowOrigin::list(origins)
     };
     Ok(CorsLayer::new()
-        .allow_methods([Method::GET])
+        .allow_methods([Method::GET, Method::POST])
         .allow_headers([AUTHORIZATION, CONTENT_TYPE])
         .allow_origin(allow))
 }
@@ -226,7 +227,17 @@ mod tests {
     }
 
     async fn get(app: &Router, uri: &str, token: Option<&str>) -> (StatusCode, Value) {
-        let mut req = Request::get(uri);
+        let (status, _, body) = send(app, Method::GET, uri, token).await;
+        (status, body)
+    }
+
+    async fn send(
+        app: &Router,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+    ) -> (StatusCode, axum::http::HeaderMap, Value) {
+        let mut req = Request::builder().method(method).uri(uri);
         if let Some(t) = token {
             req = req.header(AUTHORIZATION, format!("Bearer {t}"));
         }
@@ -236,8 +247,14 @@ mod tests {
             .await
             .unwrap();
         let status = res.status();
+        let headers = res.headers().clone();
         let bytes = res.into_body().collect().await.unwrap().to_bytes();
-        (status, serde_json::from_slice(&bytes).unwrap())
+        let body = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes).unwrap()
+        };
+        (status, headers, body)
     }
 
     #[tokio::test]
@@ -417,5 +434,35 @@ mod tests {
         let (status, body) = get(&app, "/api/v1/health", None).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["db"], "ok");
+    }
+
+    #[tokio::test]
+    async fn rotating_returns_a_new_token_and_retires_the_old_one() {
+        let (app, old) = authed(seeded().await).await;
+        let rotate = "/api/v1/token/rotate";
+
+        let (status, headers, body) = send(&app, Method::POST, rotate, Some(&old)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[axum::http::header::CACHE_CONTROL], "no-store");
+        assert_eq!(body["name"], "Tester");
+        let new = body["token"].as_str().unwrap().to_string();
+        assert_ne!(new, old);
+
+        assert_eq!(
+            get(&app, "/api/v1/tabs", Some(&old)).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            get(&app, "/api/v1/tabs", Some(&new)).await.0,
+            StatusCode::OK
+        );
+
+        // The retired token can't rotate either, and rotation needs a token at all.
+        let (status, _, _) = send(&app, Method::POST, rotate, Some(&old)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        let (status, _, _) = send(&app, Method::POST, rotate, None).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        let (status, _, _) = send(&app, Method::GET, rotate, Some(&new)).await;
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
     }
 }
