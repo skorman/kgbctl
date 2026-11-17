@@ -240,7 +240,7 @@ mod tests {
             .upsert_account(broker, account, None, "USD")
             .await
             .unwrap();
-        let run = db.start_sync_run(broker).await.unwrap();
+        let run = db.start_sync_run(broker, None).await.unwrap();
         db.apply_position_sync(run, account, broker, updates)
             .await
             .unwrap();

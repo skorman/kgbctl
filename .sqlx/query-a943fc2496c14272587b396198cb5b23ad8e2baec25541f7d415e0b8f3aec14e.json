@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO sync_runs (broker) VALUES (?) RETURNING id",
+  "query": "INSERT INTO api_users (name, token_hash, can_sync) VALUES (?, ?, ?) RETURNING id",
   "describe": {
     "columns": [
       {
@@ -9,18 +9,18 @@
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "sync_runs",
+            "table": "api_users",
             "name": "id"
           }
         }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 3
     },
     "nullable": [
       false
     ]
   },
-  "hash": "a260bee340ddfaf3bdd755a99c3b2f76218e50f84957ce4d69ac250cedbd442d"
+  "hash": "a943fc2496c14272587b396198cb5b23ad8e2baec25541f7d415e0b8f3aec14e"
 }

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO orders (\n            account_id, instrument_id, broker_order_id, side, order_type, time_in_force,\n            quantity, limit_price, stop_price, filled_quantity, avg_fill_price, fees_usd,\n            status, placed_at, updated_at, closed_at, raw)\n        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n        ON CONFLICT (account_id, broker_order_id) DO UPDATE SET\n            time_in_force   = excluded.time_in_force,\n            quantity        = excluded.quantity,\n            limit_price     = excluded.limit_price,\n            stop_price      = excluded.stop_price,\n            filled_quantity = excluded.filled_quantity,\n            avg_fill_price  = excluded.avg_fill_price,\n            fees_usd        = excluded.fees_usd,\n            status          = excluded.status,\n            updated_at      = excluded.updated_at,\n            closed_at       = excluded.closed_at,\n            raw             = excluded.raw\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 17
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ba5f5131c6d2d33a89cec41805ffc254d7ac04d5112a6659930891f8a7ed1b6d"
+}

@@ -1,94 +1,60 @@
 use chrono::{DateTime, Utc};
+use sqlx::SqliteConnection;
 
-use super::{Db, NewFill, NewOrder, Order, OrderSide, OrderStatus, OrderType, ts};
+use super::{
+    Broker, Db, ExecutionBatch, NewFill, NewOrder, Order, OrderSide, OrderStatus, OrderType,
+    instruments, ts,
+};
 
 impl Db {
+    /// Record a broker's executions for `account_id` atomically: for each batch,
+    /// upsert the instrument, the order and its fills, then refresh the order's
+    /// fees. Fills already stored are skipped. Returns how many fills were new.
+    pub async fn record_executions(
+        &self,
+        account_id: i64,
+        broker: Broker,
+        batches: &[ExecutionBatch],
+    ) -> sqlx::Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let mut new_fills = 0;
+        for b in batches {
+            let instrument_id = instruments::upsert_instrument(&mut tx, &b.instrument).await?;
+            instruments::link_broker_id(&mut tx, broker, &b.broker_instrument_id, instrument_id)
+                .await?;
+            let order = NewOrder {
+                instrument_id,
+                ..b.order.clone()
+            };
+            let order_id = upsert_order(&mut tx, account_id, &order).await?;
+            for f in &b.fills {
+                new_fills += u64::from(insert_fill(&mut tx, order_id, f).await?);
+            }
+            refresh_order_fees(&mut tx, order_id).await?;
+        }
+        tx.commit().await?;
+        Ok(new_fills)
+    }
+
     /// Insert or update an order keyed on `(account_id, broker_order_id)`,
     /// returning its id.
     pub async fn upsert_order(&self, account_id: i64, o: &NewOrder) -> sqlx::Result<i64> {
-        let placed_at = ts(o.placed_at);
-        let updated_at = ts(o.updated_at);
-        let closed_at = o.closed_at.map(ts);
-
-        sqlx::query_scalar!(
-            r#"
-            INSERT INTO orders (
-                account_id, instrument_id, broker_order_id, side, order_type, time_in_force,
-                quantity, limit_price, stop_price, filled_quantity, avg_fill_price, fees_usd,
-                status, placed_at, updated_at, closed_at, raw)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (account_id, broker_order_id) DO UPDATE SET
-                time_in_force   = excluded.time_in_force,
-                quantity        = excluded.quantity,
-                limit_price     = excluded.limit_price,
-                stop_price      = excluded.stop_price,
-                filled_quantity = excluded.filled_quantity,
-                avg_fill_price  = excluded.avg_fill_price,
-                fees_usd        = excluded.fees_usd,
-                status          = excluded.status,
-                updated_at      = excluded.updated_at,
-                closed_at       = excluded.closed_at,
-                raw             = excluded.raw
-            RETURNING id
-            "#,
-            account_id,
-            o.instrument_id,
-            o.broker_order_id,
-            o.side,
-            o.order_type,
-            o.time_in_force,
-            o.quantity,
-            o.limit_price,
-            o.stop_price,
-            o.filled_quantity,
-            o.avg_fill_price,
-            o.fees_usd,
-            o.status,
-            placed_at,
-            updated_at,
-            closed_at,
-            o.raw,
-        )
-        .fetch_one(&self.pool)
-        .await
+        let mut conn = self.pool.acquire().await?;
+        upsert_order(&mut conn, account_id, o).await
     }
 
     /// Record an execution. Re-inserting a fill already seen is a no-op.
     /// Returns whether the fill was new.
     pub async fn insert_fill(&self, order_id: i64, f: &NewFill) -> sqlx::Result<bool> {
-        let executed_at = ts(f.executed_at);
-        let result = sqlx::query!(
-            r#"
-            INSERT INTO fills (order_id, broker_fill_id, quantity, price, fee_usd, executed_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT (order_id, broker_fill_id) DO NOTHING
-            "#,
-            order_id,
-            f.broker_fill_id,
-            f.quantity,
-            f.price,
-            f.fee_usd,
-            executed_at,
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(result.rows_affected() > 0)
+        let mut conn = self.pool.acquire().await?;
+        insert_fill(&mut conn, order_id, f).await
     }
 
     /// Set an order's `fees_usd` to the sum of its recorded fills' fees, for
     /// brokers whose fills of one order can arrive across several syncs.
     pub async fn refresh_order_fees(&self, order_id: i64) -> sqlx::Result<()> {
-        sqlx::query!(
-            r#"
-            UPDATE orders
-            SET fees_usd = (SELECT COALESCE(SUM(fee_usd), 0) FROM fills WHERE order_id = ?1)
-            WHERE id = ?1
-            "#,
-            order_id,
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
+        let mut conn = self.pool.acquire().await?;
+        refresh_order_fees(&mut conn, order_id).await
     }
 
     /// Execution time of the newest fill recorded for `account_id`: where the
@@ -129,10 +95,100 @@ impl Db {
     }
 }
 
+async fn upsert_order(
+    conn: &mut SqliteConnection,
+    account_id: i64,
+    o: &NewOrder,
+) -> sqlx::Result<i64> {
+    let placed_at = ts(o.placed_at);
+    let updated_at = ts(o.updated_at);
+    let closed_at = o.closed_at.map(ts);
+
+    sqlx::query_scalar!(
+        r#"
+        INSERT INTO orders (
+            account_id, instrument_id, broker_order_id, side, order_type, time_in_force,
+            quantity, limit_price, stop_price, filled_quantity, avg_fill_price, fees_usd,
+            status, placed_at, updated_at, closed_at, raw)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (account_id, broker_order_id) DO UPDATE SET
+            time_in_force   = excluded.time_in_force,
+            quantity        = excluded.quantity,
+            limit_price     = excluded.limit_price,
+            stop_price      = excluded.stop_price,
+            filled_quantity = excluded.filled_quantity,
+            avg_fill_price  = excluded.avg_fill_price,
+            fees_usd        = excluded.fees_usd,
+            status          = excluded.status,
+            updated_at      = excluded.updated_at,
+            closed_at       = excluded.closed_at,
+            raw             = excluded.raw
+        RETURNING id
+        "#,
+        account_id,
+        o.instrument_id,
+        o.broker_order_id,
+        o.side,
+        o.order_type,
+        o.time_in_force,
+        o.quantity,
+        o.limit_price,
+        o.stop_price,
+        o.filled_quantity,
+        o.avg_fill_price,
+        o.fees_usd,
+        o.status,
+        placed_at,
+        updated_at,
+        closed_at,
+        o.raw,
+    )
+    .fetch_one(&mut *conn)
+    .await
+}
+
+async fn insert_fill(
+    conn: &mut SqliteConnection,
+    order_id: i64,
+    f: &NewFill,
+) -> sqlx::Result<bool> {
+    let executed_at = ts(f.executed_at);
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO fills (order_id, broker_fill_id, quantity, price, fee_usd, executed_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT (order_id, broker_fill_id) DO NOTHING
+        "#,
+        order_id,
+        f.broker_fill_id,
+        f.quantity,
+        f.price,
+        f.fee_usd,
+        executed_at,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+async fn refresh_order_fees(conn: &mut SqliteConnection, order_id: i64) -> sqlx::Result<()> {
+    sqlx::query!(
+        r#"
+        UPDATE orders
+        SET fees_usd = (SELECT COALESCE(SUM(fee_usd), 0) FROM fills WHERE order_id = ?1)
+        WHERE id = ?1
+        "#,
+        order_id,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{AssetClass, Broker, NewInstrument};
+    use crate::db::{AssetClass, NewInstrument};
 
     #[tokio::test]
     async fn order_upsert_and_fills_round_trip() {
@@ -203,5 +259,75 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(fills, 1);
+    }
+
+    #[tokio::test]
+    async fn record_executions_is_idempotent_and_sums_fees() {
+        let db = Db::connect_in_memory().await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
+        let at = "2026-11-15T14:30:00Z".parse::<DateTime<Utc>>().unwrap();
+        let fill = |id: &str, fee: f64| NewFill {
+            broker_fill_id: id.into(),
+            quantity: 5.0,
+            price: 100.0,
+            fee_usd: fee,
+            executed_at: at,
+        };
+        let batch = ExecutionBatch {
+            instrument: NewInstrument {
+                symbol: "NVDA".into(),
+                asset_class: AssetClass::Stock,
+                currency: "USD".into(),
+                exchange: Some("NASDAQ".into()),
+                name: None,
+            },
+            broker_instrument_id: "4815747".into(),
+            order: NewOrder {
+                instrument_id: 0, // resolved from `instrument`
+                broker_order_id: "42".into(),
+                side: OrderSide::Buy,
+                order_type: OrderType::Other,
+                time_in_force: None,
+                quantity: 10.0,
+                limit_price: None,
+                stop_price: None,
+                filled_quantity: 10.0,
+                avg_fill_price: Some(100.0),
+                fees_usd: 0.0,
+                status: OrderStatus::Filled,
+                placed_at: at,
+                updated_at: at,
+                closed_at: Some(at),
+                raw: None,
+            },
+            fills: vec![fill("42.01", 1.0), fill("42.02", 1.5)],
+        };
+
+        assert_eq!(
+            db.record_executions(account, Broker::Ibkr, std::slice::from_ref(&batch))
+                .await
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            db.record_executions(account, Broker::Ibkr, &[batch])
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(db.latest_fill_time(account).await.unwrap(), Some(at));
+        let (instrument_id, fees): (i64, f64) =
+            sqlx::query_as("SELECT instrument_id, fees_usd FROM orders")
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(fees, 2.5);
+        assert_eq!(
+            db.resolve_broker_id(Broker::Ibkr, "4815747").await.unwrap(),
+            Some(instrument_id)
+        );
     }
 }

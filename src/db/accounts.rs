@@ -29,6 +29,22 @@ impl Db {
         .await
     }
 
+    /// One account by id, if it exists.
+    pub async fn account(&self, id: i64) -> sqlx::Result<Option<Account>> {
+        sqlx::query_as!(
+            Account,
+            r#"
+            SELECT id, broker AS "broker: Broker", external_id, name, base_currency,
+                   created_at AS "created_at: DateTime<Utc>"
+            FROM accounts
+            WHERE id = ?
+            "#,
+            id,
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn list_accounts(&self) -> sqlx::Result<Vec<Account>> {
         sqlx::query_as!(
             Account,
@@ -61,6 +77,11 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(a, b);
+        assert_eq!(
+            db.account(a).await.unwrap().unwrap().external_id,
+            "U1234567"
+        );
+        assert!(db.account(a + 1).await.unwrap().is_none());
 
         let accounts = db.list_accounts().await.unwrap();
         assert_eq!(accounts.len(), 1);

@@ -13,6 +13,8 @@ pub struct Caller {
     pub name: String,
     /// Hash of the token this request was made with.
     pub token_hash: String,
+    /// May push sync data (`/sync/*`).
+    pub can_sync: bool,
 }
 
 /// Require `Authorization: Bearer <token>` matching an `api_users` row. Records
@@ -41,6 +43,22 @@ pub async fn require_user(
         id: user.id,
         name: user.name,
         token_hash: hash,
+        can_sync: user.can_sync,
     });
     Ok(next.run(req).await)
+}
+
+/// After `require_user`: reject callers without the sync permission. Browser
+/// tokens are read-only; only a user created with `--sync` can write.
+pub async fn require_sync(req: Request, next: Next) -> Result<Response, ApiError> {
+    match req.extensions().get::<Caller>() {
+        Some(c) if c.can_sync => Ok(next.run(req).await),
+        Some(c) => {
+            tracing::warn!(user = %c.name, "rejected sync request: user lacks sync permission");
+            Err(ApiError::Forbidden(
+                "this user may not push sync data".into(),
+            ))
+        }
+        None => Err(ApiError::Unauthorized),
+    }
 }

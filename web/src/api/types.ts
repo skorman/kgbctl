@@ -24,6 +24,8 @@ export interface TabSummary { name: string; totals: Totals; holding_count: numbe
 export interface SyncRun {
   id: number; broker: Broker; started_at: string; finished_at: string | null;
   status: SyncStatus; error: string | null;
+  /** API user that pushed the run from another machine; null for runs made on the server. */
+  pushed_by: string | null;
 }
 
 export interface Source { broker: Broker; label: string; totals: Totals; last_run: SyncRun | null }

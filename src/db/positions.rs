@@ -236,7 +236,7 @@ mod tests {
     }
 
     async fn sync(db: &Db, account_id: i64, updates: &[PositionUpdate]) -> i64 {
-        let run = db.start_sync_run(Broker::Ibkr).await.unwrap();
+        let run = db.start_sync_run(Broker::Ibkr, None).await.unwrap();
         db.apply_position_sync(run, account_id, Broker::Ibkr, updates)
             .await
             .unwrap();

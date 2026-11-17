@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE api_users SET can_sync = ? WHERE name = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "85852d52e835bbfe62aa66b3f7a92e42ba334a7add89dda1b75f9189a37a8aa5"
+}

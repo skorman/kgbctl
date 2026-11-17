@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, broker AS \"broker: Broker\",\n                   started_at AS \"started_at: DateTime<Utc>\",\n                   finished_at AS \"finished_at: DateTime<Utc>\",\n                   status AS \"status: SyncStatus\", error\n            FROM sync_runs\n            WHERE ?1 IS NULL OR broker = ?1\n            ORDER BY id DESC\n            LIMIT ?2\n            ",
+  "query": "\n            SELECT id, broker AS \"broker: Broker\",\n                   started_at AS \"started_at: DateTime<Utc>\",\n                   finished_at AS \"finished_at: DateTime<Utc>\",\n                   status AS \"status: SyncStatus\", error, pushed_by\n            FROM sync_runs\n            WHERE broker = ?\n            ORDER BY id DESC\n            LIMIT 1\n            ",
   "describe": {
     "columns": [
       {
@@ -68,10 +68,21 @@
             "name": "error"
           }
         }
+      },
+      {
+        "name": "pushed_by",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "pushed_by"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -79,8 +90,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "ff077fefbf37ea5e807a4eee04059d0f5d348e45b74ce57ff7013dc733dd08b7"
+  "hash": "4aac571e6168ea4ab53ed5f6bdeaaab21c175626413913ffdf94349c442a2c78"
 }

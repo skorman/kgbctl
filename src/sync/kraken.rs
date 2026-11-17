@@ -17,8 +17,8 @@ use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
 
-use super::{SyncOptions, SyncReport};
-use crate::db::{AssetClass, Broker, Db, KrakenLedgerEntry, NewInstrument, PositionUpdate};
+use super::{Store, SyncOptions, SyncReport};
+use crate::db::{AssetClass, Broker, KrakenLedgerEntry, NewInstrument, PositionUpdate};
 
 const BASE: &str = "https://api.kraken.com";
 /// One API key is one account; this is its `accounts.external_id`.
@@ -43,7 +43,7 @@ impl std::fmt::Debug for Config {
 }
 
 pub async fn sync(
-    db: &Db,
+    db: &Store,
     run_id: i64,
     cfg: &Config,
     opts: SyncOptions,

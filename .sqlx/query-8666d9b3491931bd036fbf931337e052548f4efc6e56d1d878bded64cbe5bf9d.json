@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE sync_runs\n            SET finished_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), status = 'error',\n                error = 'superseded by a new run'\n            WHERE broker = ? AND status = 'running'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8666d9b3491931bd036fbf931337e052548f4efc6e56d1d878bded64cbe5bf9d"
+}

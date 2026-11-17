@@ -37,11 +37,15 @@ pub struct App {
     pub should_quit: bool,
     /// Startup animation; shown instead of the dashboard until it finishes.
     pub splash: Option<Splash>,
+    /// Host that `s` syncs into, when it isn't the local database.
+    pub remote: Option<String>,
+    /// Set after a sync into `remote`: the dashboard still shows local data.
+    pub synced_remotely: bool,
     loaded_at: Instant,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(remote: Option<String>) -> Self {
         Self {
             snapshot: Snapshot::default(),
             view: View::Overview,
@@ -52,6 +56,8 @@ impl App {
             error: None,
             should_quit: false,
             splash: None,
+            remote,
+            synced_remotely: false,
             loaded_at: Instant::now(),
         }
     }
@@ -103,6 +109,7 @@ impl App {
             .filter_map(|(b, r)| r.as_ref().err().map(|e| format!("{b:?}: {e:#}")))
             .collect();
         self.error = (!errors.is_empty()).then(|| errors.join("; "));
+        self.synced_remotely = self.remote.is_some() && errors.len() < results.len();
     }
 
     pub fn on_key(&mut self, key: KeyEvent) -> Action {

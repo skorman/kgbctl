@@ -9,6 +9,8 @@ use serde_json::json;
 pub enum ApiError {
     BadRequest(String),
     Unauthorized,
+    /// Authenticated, but the user may not do this.
+    Forbidden(String),
     NotFound(String),
     Internal(anyhow::Error),
 }
@@ -28,6 +30,7 @@ impl IntoResponse for ApiError {
                 "unauthorized",
                 "missing or invalid bearer token".into(),
             ),
+            Self::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m),
             // Log the details; don't hand them to clients.
             Self::Internal(e) => {

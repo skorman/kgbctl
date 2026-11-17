@@ -1,10 +1,13 @@
-//! HTTP API over the database, for frontends other than the TUI. Read-only
-//! apart from token rotation; it never contacts a broker.
+//! HTTP API over the database, for frontends other than the TUI. It never
+//! contacts a broker. Reads need any API user's token; the only writes are
+//! token rotation and, for users with the sync permission, the `/sync/*`
+//! endpoints a remote `kgbctl -c sync` pushes broker data through.
 
 mod auth;
 mod dto;
 mod error;
 mod routes;
+mod sync_routes;
 pub mod token;
 
 use std::io::IsTerminal;
@@ -12,7 +15,7 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use axum::Router;
-use axum::extract::Request;
+use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
 use axum::http::{HeaderValue, Method};
 use axum::middleware;
@@ -35,10 +38,40 @@ pub struct ServeConfig {
     pub cors_origins: Vec<String>,
 }
 
+/// A Kraken ledger page or a batch of IBKR executions can be large.
+const SYNC_BODY_LIMIT: usize = 16 * 1024 * 1024;
+
 /// Every route but `/health` needs `Authorization: Bearer <token>` for a user in
-/// `api_users`.
+/// `api_users`; `/sync/*` also needs that user's `can_sync`.
 pub fn router(db: Db) -> Router {
     let state = AppState { db };
+
+    let sync = Router::new()
+        .route("/sync/runs", post(sync_routes::start_run))
+        .route("/sync/runs/{id}/finish", post(sync_routes::finish_run))
+        .route(
+            "/sync/runs/{id}/positions",
+            post(sync_routes::apply_positions),
+        )
+        .route("/sync/accounts", post(sync_routes::upsert_account))
+        .route(
+            "/sync/accounts/{id}/kraken/cursor",
+            get(sync_routes::kraken_cursor),
+        )
+        .route(
+            "/sync/accounts/{id}/kraken/ledger",
+            get(sync_routes::kraken_ledger).post(sync_routes::insert_kraken_ledger),
+        )
+        .route(
+            "/sync/accounts/{id}/fills/latest",
+            get(sync_routes::latest_fill),
+        )
+        .route(
+            "/sync/accounts/{id}/executions",
+            post(sync_routes::record_executions),
+        )
+        .route_layer(middleware::from_fn(auth::require_sync))
+        .layer(DefaultBodyLimit::max(SYNC_BODY_LIMIT));
 
     let protected = Router::new()
         .route("/snapshot", get(routes::snapshot))
@@ -53,6 +86,7 @@ pub fn router(db: Db) -> Router {
         .route("/orders/open", get(routes::open_orders))
         .route("/sync/runs", get(routes::sync_runs))
         .route("/token/rotate", post(routes::rotate_token))
+        .merge(sync)
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_user,
@@ -151,8 +185,10 @@ mod tests {
     use serde_json::Value;
     use tower::ServiceExt;
 
+    use serde_json::json;
+
     use super::*;
-    use crate::db::{AssetClass, Broker, NewInstrument, PositionUpdate};
+    use crate::db::{AssetClass, Broker, NewInstrument, PositionUpdate, SyncStatus};
     use crate::portfolio::Snapshot;
 
     fn update(
@@ -187,7 +223,7 @@ mod tests {
             .upsert_account(broker, account, None, "USD")
             .await
             .unwrap();
-        let run = db.start_sync_run(broker).await.unwrap();
+        let run = db.start_sync_run(broker, None).await.unwrap();
         db.apply_position_sync(run, account, broker, updates)
             .await
             .unwrap();
@@ -217,13 +253,22 @@ mod tests {
         db
     }
 
-    /// A router over `db` with one user, and that user's token.
+    /// A router over `db` with one read-only user, and that user's token.
     async fn authed(db: Db) -> (Router, String) {
         let token = token::generate().unwrap();
-        db.create_api_user("Tester", &token::hash(&token))
+        db.create_api_user("Tester", &token::hash(&token), false)
             .await
             .unwrap();
         (router(db), token)
+    }
+
+    /// A token for a new user allowed to push syncs.
+    async fn sync_user(db: &Db, name: &str) -> String {
+        let token = token::generate().unwrap();
+        db.create_api_user(name, &token::hash(&token), true)
+            .await
+            .unwrap();
+        token
     }
 
     async fn get(app: &Router, uri: &str, token: Option<&str>) -> (StatusCode, Value) {
@@ -237,15 +282,33 @@ mod tests {
         uri: &str,
         token: Option<&str>,
     ) -> (StatusCode, axum::http::HeaderMap, Value) {
+        send_json(app, method, uri, token, None).await
+    }
+
+    async fn post(app: &Router, uri: &str, token: &str, body: Value) -> (StatusCode, Value) {
+        let (status, _, body) = send_json(app, Method::POST, uri, Some(token), Some(body)).await;
+        (status, body)
+    }
+
+    async fn send_json(
+        app: &Router,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        json: Option<Value>,
+    ) -> (StatusCode, axum::http::HeaderMap, Value) {
         let mut req = Request::builder().method(method).uri(uri);
         if let Some(t) = token {
             req = req.header(AUTHORIZATION, format!("Bearer {t}"));
         }
-        let res = app
-            .clone()
-            .oneshot(req.body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let body = match json {
+            Some(v) => {
+                req = req.header(CONTENT_TYPE, "application/json");
+                Body::from(v.to_string())
+            }
+            None => Body::empty(),
+        };
+        let res = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
         let status = res.status();
         let headers = res.headers().clone();
         let bytes = res.into_body().collect().await.unwrap().to_bytes();
@@ -464,5 +527,176 @@ mod tests {
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         let (status, _, _) = send(&app, Method::GET, rotate, Some(&new)).await;
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[tokio::test]
+    async fn sync_endpoints_need_the_sync_permission() {
+        let db = seeded().await;
+        let (app, reader) = authed(db.clone()).await;
+        let pusher = sync_user(&db, "Laptop").await;
+        let start = json!({ "broker": "kraken" });
+
+        let (status, _, body) = send_json(
+            &app,
+            Method::POST,
+            "/api/v1/sync/runs",
+            None,
+            Some(start.clone()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["error"]["code"], "unauthorized");
+
+        let (status, body) = post(&app, "/api/v1/sync/runs", &reader, start.clone()).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(body["error"]["code"], "forbidden");
+        // A read-only user still reads.
+        assert_eq!(
+            get(&app, "/api/v1/tabs", Some(&reader)).await.0,
+            StatusCode::OK
+        );
+
+        let (status, body) = post(&app, "/api/v1/sync/runs", &pusher, start).await;
+        assert_eq!(status, StatusCode::OK);
+        let run = db
+            .sync_run(body["id"].as_i64().unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(run.pushed_by.as_deref(), Some("Laptop"));
+        assert_eq!(run.status, SyncStatus::Running);
+    }
+
+    #[tokio::test]
+    async fn remote_sync_round_trip_stores_what_a_local_sync_would() {
+        use AssetClass::Crypto;
+        let db = Db::connect_in_memory().await.unwrap();
+        let pusher = sync_user(&db, "Laptop").await;
+        let app = router(db.clone());
+        // A stale run from a client that died.
+        let stale = db
+            .start_sync_run(Broker::Kraken, Some("Laptop"))
+            .await
+            .unwrap();
+
+        let (status, body) = post(
+            &app,
+            "/api/v1/sync/runs",
+            &pusher,
+            json!({"broker": "kraken"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let run = body["id"].as_i64().unwrap();
+        assert_eq!(
+            db.sync_run(stale).await.unwrap().unwrap().status,
+            SyncStatus::Error
+        );
+
+        let (status, body) = post(
+            &app,
+            "/api/v1/sync/accounts",
+            &pusher,
+            json!({"broker": "kraken", "external_id": "main", "name": null, "base_currency": "USD"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let account = body["id"].as_i64().unwrap();
+
+        let (status, body) = get(
+            &app,
+            &format!("/api/v1/sync/accounts/{account}/kraken/cursor"),
+            Some(&pusher),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body["time"].is_null());
+
+        let entries = json!([
+            {"ledger_id": "L1", "refid": "T1", "time": 100.0, "entry_type": "trade", "subtype": null,
+             "asset": "ZUSD", "amount": -100.0, "fee": 0.0, "balance": null, "raw": "{}"},
+            {"ledger_id": "L2", "refid": "T1", "time": 100.0, "entry_type": "trade", "subtype": null,
+             "asset": "XXBT", "amount": 1.0, "fee": 0.0, "balance": null, "raw": "{}"}
+        ]);
+        let ledger_uri = format!("/api/v1/sync/accounts/{account}/kraken/ledger");
+        let (status, body) = post(&app, &ledger_uri, &pusher, entries.clone()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["count"], 2);
+        let (_, body) = post(&app, &ledger_uri, &pusher, entries).await;
+        assert_eq!(body["count"], 0);
+        let (_, body) = get(
+            &app,
+            &format!("/api/v1/sync/accounts/{account}/kraken/cursor"),
+            Some(&pusher),
+        )
+        .await;
+        assert_eq!(body["time"], 100.0);
+        let (_, body) = get(&app, &ledger_uri, Some(&pusher)).await;
+        assert_eq!(body.as_array().unwrap().len(), 2);
+        assert!(body[0]["raw"].is_null(), "raw is not sent back");
+
+        let updates = serde_json::to_value([update("BTC", Crypto, 1.0, 90000.0, 100.0)]).unwrap();
+        let (status, _) = post(
+            &app,
+            &format!("/api/v1/sync/runs/{run}/positions"),
+            &pusher,
+            json!({"account_id": account, "broker": "kraken", "updates": updates}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        // Broker mismatch between body and run/account is refused.
+        let (status, _) = post(
+            &app,
+            &format!("/api/v1/sync/runs/{run}/positions"),
+            &pusher,
+            json!({"account_id": account, "broker": "ibkr", "updates": []}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+
+        let (status, _) = post(
+            &app,
+            &format!("/api/v1/sync/runs/{run}/finish"),
+            &pusher,
+            json!({"status": "ok", "error": null}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        // Finished runs can't be written to again.
+        let (status, _) = post(
+            &app,
+            &format!("/api/v1/sync/runs/{run}/finish"),
+            &pusher,
+            json!({"status": "ok", "error": null}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let (status, _) = post(
+            &app,
+            "/api/v1/sync/runs/9999/finish",
+            &pusher,
+            json!({"status": "ok", "error": null}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        // What a local sync of the same data produces.
+        let local = Db::connect_in_memory().await.unwrap();
+        sync(
+            &local,
+            Broker::Kraken,
+            "main",
+            &[update("BTC", Crypto, 1.0, 90000.0, 100.0)],
+        )
+        .await;
+        let (ours, theirs) = (
+            Snapshot::load(&db).await.unwrap(),
+            Snapshot::load(&local).await.unwrap(),
+        );
+        assert_eq!(ours.totals, theirs.totals);
+        assert_eq!(ours.tabs, theirs.tabs);
+        let run = db.last_sync_run(Broker::Kraken).await.unwrap().unwrap();
+        assert_eq!(run.status, SyncStatus::Ok);
+        assert_eq!(run.pushed_by.as_deref(), Some("Laptop"));
     }
 }

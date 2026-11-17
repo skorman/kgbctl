@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, name, created_at AS \"created_at: DateTime<Utc>\",\n                   last_active_at AS \"last_active_at: DateTime<Utc>\"\n            FROM api_users\n            ORDER BY name\n            ",
+  "query": "\n            UPDATE api_users SET last_active_at = ?\n            WHERE token_hash = ?\n            RETURNING id, name, created_at AS \"created_at: DateTime<Utc>\",\n                      last_active_at AS \"last_active_at: DateTime<Utc>\",\n                      can_sync AS \"can_sync: bool\"\n            ",
   "describe": {
     "columns": [
       {
@@ -46,17 +46,29 @@
             "name": "last_active_at"
           }
         }
+      },
+      {
+        "name": "can_sync: bool",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_users",
+            "name": "can_sync"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 2
     },
     "nullable": [
       false,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "aca68c534f37e9162cdd1a7b7ec554928bd65446f82da571e6d3ae987d2d0b42"
+  "hash": "118ca245f642c61a8aee8d13e5745ba0678643ff57786a4b7dab31701c55aabb"
 }

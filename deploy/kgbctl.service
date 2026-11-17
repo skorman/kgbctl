@@ -1,4 +1,5 @@
-# Read-only kgbctl API on the Raspberry Pi.
+# kgbctl API on the Raspberry Pi. Serves the web app and receives remote syncs
+# (`kgbctl -c sync --remote` from the machine with the broker credentials).
 #
 #   sudo useradd --system --home /var/lib/kgbctl --shell /usr/sbin/nologin kgbctl
 #   sudo install -d -o kgbctl -g kgbctl /var/lib/kgbctl

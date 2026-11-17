@@ -27,7 +27,7 @@ fn query<T>(q: Result<Query<T>, QueryRejection>) -> Result<T, ApiError> {
         .map_err(|e| ApiError::BadRequest(e.body_text()))
 }
 
-fn path<T>(p: Result<Path<T>, PathRejection>) -> Result<T, ApiError> {
+pub(super) fn path<T>(p: Result<Path<T>, PathRejection>) -> Result<T, ApiError> {
     p.map(|Path(p)| p)
         .map_err(|e| ApiError::BadRequest(e.body_text()))
 }

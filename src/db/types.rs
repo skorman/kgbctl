@@ -13,7 +13,7 @@ pub enum Broker {
     Kraken,
 }
 
-#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum AssetClass {
@@ -27,7 +27,7 @@ pub enum AssetClass {
     Other,
 }
 
-#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum SyncStatus {
@@ -36,7 +36,7 @@ pub enum SyncStatus {
     Error,
 }
 
-#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum OrderSide {
@@ -44,7 +44,7 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum OrderType {
@@ -56,7 +56,7 @@ pub enum OrderType {
     Other,
 }
 
-#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum OrderStatus {
@@ -86,6 +86,8 @@ pub struct ApiUser {
     pub name: String,
     pub created_at: DateTime<Utc>,
     pub last_active_at: Option<DateTime<Utc>>,
+    /// May push sync data through the `/sync/*` endpoints.
+    pub can_sync: bool,
 }
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq)]
@@ -99,7 +101,7 @@ pub struct Instrument {
 }
 
 /// An instrument as reported by a broker, before it has a database id.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct NewInstrument {
     pub symbol: String,
     pub asset_class: AssetClass,
@@ -116,10 +118,12 @@ pub struct SyncRun {
     pub finished_at: Option<DateTime<Utc>>,
     pub status: SyncStatus,
     pub error: Option<String>,
+    /// API user that pushed the run from another machine; `None` for local runs.
+    pub pushed_by: Option<String>,
 }
 
 /// One position as reported by a broker during a sync.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct PositionUpdate {
     pub instrument: NewInstrument,
     /// Broker's identifier for the instrument (IBKR conId, Kraken asset code).
@@ -205,7 +209,7 @@ pub struct Order {
 }
 
 /// An order as reported by a broker; upserted on `(account_id, broker_order_id)`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct NewOrder {
     pub instrument_id: i64,
     pub broker_order_id: String,
@@ -226,7 +230,7 @@ pub struct NewOrder {
 }
 
 /// One row of Kraken's `Ledgers` history, stored as reported.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct KrakenLedgerEntry {
     pub ledger_id: String,
     pub refid: String,
@@ -242,11 +246,24 @@ pub struct KrakenLedgerEntry {
     pub raw: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct NewFill {
     pub broker_fill_id: String,
     pub quantity: f64,
     pub price: f64,
     pub fee_usd: f64,
     pub executed_at: DateTime<Utc>,
+}
+
+/// One order and its fills as reported by a broker, with the instrument
+/// described rather than referenced, so it can be recorded in any database
+/// (local or remote) in a single transaction.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+pub struct ExecutionBatch {
+    pub instrument: NewInstrument,
+    /// Broker's identifier for the instrument (IBKR conId).
+    pub broker_instrument_id: String,
+    /// `instrument_id` is ignored and resolved from `instrument` on insert.
+    pub order: NewOrder,
+    pub fills: Vec<NewFill>,
 }

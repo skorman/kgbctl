@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, broker AS \"broker: Broker\",\n                   started_at AS \"started_at: DateTime<Utc>\",\n                   finished_at AS \"finished_at: DateTime<Utc>\",\n                   status AS \"status: SyncStatus\", error, pushed_by\n            FROM sync_runs\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "broker: Broker",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "broker"
+          }
+        }
+      },
+      {
+        "name": "started_at: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "name": "finished_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "finished_at"
+          }
+        }
+      },
+      {
+        "name": "status: SyncStatus",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "error",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "name": "pushed_by",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "pushed_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e1e137927d027e0b89ee154e797f7c84e89bc74b5c00a8001960c761cc97e82a"
+}

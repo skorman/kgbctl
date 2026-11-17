@@ -45,6 +45,26 @@ cargo run -- -c sync --broker ibkr    # or kraken
 cargo run -- -c sync --full           # refetch all history
 ```
 
+### Remote sync
+
+Broker credentials stay on the machine you sync from, but the data can go to another kgbctl server's database (the Pi behind its tunnel) instead of the local one. On the server, create an API user allowed to push syncs:
+
+```sh
+kgbctl -c user-add --name laptop --sync     # prints the token
+kgbctl -c user-grant-sync --name laptop     # or grant / revoke it later
+kgbctl -c user-revoke-sync --name laptop
+```
+
+Then sync locally with `--remote`, or set `KGB_REMOTE` and `KGB_REMOTE_TOKEN`:
+
+```sh
+cargo run -- -c sync --remote https://kgb.example.com --remote-token kgb_...
+```
+
+The sync runs exactly as it does locally: it reads its cursors (newest stored Kraken ledger entry, newest IBKR fill) from the remote, fetches only what's new from the brokers, and writes positions, snapshots, ledger entries, orders and fills over the API. No local database is opened. `--full`, `--broker` and the TUI's `s` key work the same way; with a remote configured, the TUI pushes there while its dashboard keeps showing the local database.
+
+Only users created with `--sync` can call the write endpoints; a browser's token can only read. The remote records who pushed each run (`pushed_by`), shown on the web app's Sync runs page.
+
 ## TUI
 
 ```sh
@@ -65,7 +85,7 @@ The database path defaults to `var/kgb.db`. To use a different file, pass `--db 
 
 ## Server
 
-A JSON API over the same data the TUI shows. It serves what's in the database and never contacts a broker. The only thing a client can change is its own token.
+A JSON API over the same data the TUI shows. It serves what's in the database and never contacts a broker. A client can change its own token, and a user with the sync permission can push broker data (see *Remote sync*).
 
 ```sh
 cargo run -- -c serve                          # listens on 0.0.0.0:8080
@@ -75,7 +95,8 @@ Every request except `/health` needs a bearer token belonging to an API user. Ea
 
 ```sh
 cargo run -- -c user-add --name Sam        # prints Sam's token
-cargo run -- -c user-list                  # names and last activity
+cargo run -- -c user-add --name pi --sync  # a user that may push syncs
+cargo run -- -c user-list                  # names, sync permission and last activity
 cargo run -- -c user-rotate --name Sam     # issue a new token; the old one stops working
                                            # (or the user can call POST /api/v1/token/rotate)
 cargo run -- -c user-remove --name Sam
@@ -84,6 +105,7 @@ cargo run -- -c user-remove --name Sam
 | Variable / flag | Default | Purpose |
 | --- | --- | --- |
 | `KGB_BIND` / `--bind` | `0.0.0.0:8080` | Listen address |
+| `KGB_REMOTE` / `--remote`, `KGB_REMOTE_TOKEN` / `--remote-token` | unset | Sync into this server instead of the local database (see *Remote sync*) |
 | `--cors-origin <url>` | any origin | Restrict browser origins; repeat for several |
 | `RUST_LOG` | `kgbctl=info,tower_http=info` | Log filter |
 
@@ -101,8 +123,9 @@ All endpoints are under `/api/v1` and are `GET` unless noted. Money is in USD; p
 | `/orders/open` | Working orders |
 | `/sync/runs?broker=&limit=` | Sync attempts, newest first (`limit` defaults to 50, max 500) |
 | `POST /token/rotate` | `{name, token}`: a new token for the caller. The token used for the request stops working immediately |
+| `/sync/...` | Write endpoints used by `kgbctl -c sync --remote`: start/finish a run, upsert an account, push positions, Kraken ledger entries and IBKR executions, read sync cursors. Need a user with the sync permission (403 otherwise); see `src/sync/wire.rs` for the bodies |
 
-Errors are `{"error": {"code", "message"}}` with status 400, 401, 404 or 500.
+Errors are `{"error": {"code", "message"}}` with status 400, 401, 403, 404 or 500.
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/snapshot | jq
@@ -125,9 +148,11 @@ The startup animation is `assets/kgb_horse_loading_animation.gif`, same as the T
 
 Build for 64-bit ARM Linux, either natively on the Pi with `nix build .#packages.aarch64-linux.default`, or cross-compiled with `SQLX_OFFLINE=true cargo zigbuild --release --target aarch64-unknown-linux-gnu`. Then follow the steps at the top of `deploy/kgbctl.service` to install the binary and the systemd unit.
 
-The server doesn't sync yet, so copy the database over. `.backup` makes a consistent copy even while the database is in use. The copy replaces the Pi's API users too, so manage users in the local database before copying:
+Populate the Pi's database from your machine with *Remote sync* above: create a `--sync` user on the Pi, then run `kgbctl -c sync --remote https://<tunnel host> --remote-token ...` locally (a cron job or launchd agent works well). To seed it with existing history instead, copy the database once; `.backup` makes a consistent copy even while the database is in use, and the copy replaces the Pi's API users too:
 
 ```sh
 sqlite3 var/kgb.db ".backup /tmp/kgb.db"
 scp /tmp/kgb.db pi:/tmp/ && ssh pi 'sudo install -o kgbctl -g kgbctl /tmp/kgb.db /var/lib/kgbctl/kgb.db'
 ```
+
+After adding or changing `sqlx::query!` calls, refresh the offline cache the Pi/nix build compiles against: `cargo sqlx prepare` (needs `DATABASE_URL` pointing at a migrated database).

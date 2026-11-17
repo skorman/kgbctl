@@ -17,10 +17,10 @@ use ibapi::contracts::{Contract, SecurityType};
 use ibapi::orders::{CommissionReport, ExecutionData, ExecutionFilter, ExecutionSide, Executions};
 use ibapi::subscriptions::{SubscriptionItem, SubscriptionItemStreamExt};
 
-use super::{SyncOptions, SyncReport};
+use super::{Store, SyncOptions, SyncReport};
 use crate::db::{
-    AssetClass, Broker, Db, NewFill, NewInstrument, NewOrder, OrderSide, OrderStatus, OrderType,
-    PositionUpdate,
+    AssetClass, Broker, ExecutionBatch, NewFill, NewInstrument, NewOrder, OrderSide, OrderStatus,
+    OrderType, PositionUpdate,
 };
 
 /// Re-fetch this much before the newest stored fill; fills are idempotent.
@@ -35,7 +35,7 @@ pub struct Config {
 }
 
 pub async fn sync(
-    db: &Db,
+    db: &Store,
     run_id: i64,
     cfg: &Config,
     opts: SyncOptions,
@@ -144,9 +144,9 @@ fn asset_class(t: &SecurityType) -> AssetClass {
 }
 
 /// Fetch executions since the newest stored fill and record them as orders
-/// and fills. Returns how many fills were new.
+/// and fills, in one write. Returns how many fills were new.
 async fn sync_executions(
-    db: &Db,
+    db: &Store,
     client: &Client,
     code: &str,
     account_id: i64,
@@ -180,22 +180,26 @@ async fn sync_executions(
         }
     }
 
-    let mut new_fills = 0;
+    let batches = execution_batches(&executions, &commissions)?;
+    db.record_executions(account_id, Broker::Ibkr, &batches)
+        .await
+}
+
+/// Group executions by order into what gets stored. Executions carry no order
+/// type or limit prices, and only filled quantity, so each order row is a
+/// summary of what was filled.
+fn execution_batches(
+    executions: &[ExecutionData],
+    commissions: &HashMap<String, CommissionReport>,
+) -> anyhow::Result<Vec<ExecutionBatch>> {
     let mut orders: HashMap<String, Vec<&ExecutionData>> = HashMap::new();
-    for d in &executions {
+    for d in executions {
         orders.entry(order_key(d)).or_default().push(d);
     }
 
+    let mut batches = Vec::with_capacity(orders.len());
     for (key, execs) in orders {
         let first = execs[0];
-        let instrument_id = db.upsert_instrument(&instrument(&first.contract)).await?;
-        db.link_broker_id(
-            Broker::Ibkr,
-            &first.contract.contract_id.to_string(),
-            instrument_id,
-        )
-        .await?;
-
         let times = execs
             .iter()
             .map(|d| parse_time(&d.execution.time))
@@ -211,57 +215,49 @@ async fn sync_executions(
         let placed_at = *times.iter().min().unwrap();
         let updated_at = *times.iter().max().unwrap();
 
-        // Executions carry no order type or limit prices, and only filled
-        // quantity, so the order row is a summary of what was filled.
-        let order_id = db
-            .upsert_order(
-                account_id,
-                &NewOrder {
-                    instrument_id,
-                    broker_order_id: key,
-                    side: match first.execution.side {
-                        ExecutionSide::Bought => OrderSide::Buy,
-                        ExecutionSide::Sold => OrderSide::Sell,
-                    },
-                    order_type: OrderType::Other,
-                    time_in_force: None,
-                    quantity: latest.execution.cumulative_quantity,
-                    limit_price: None,
-                    stop_price: None,
-                    filled_quantity: latest.execution.cumulative_quantity,
-                    avg_fill_price: Some(latest.execution.average_price),
-                    fees_usd: 0.0,
-                    status: OrderStatus::Filled,
-                    placed_at,
-                    updated_at,
-                    closed_at: Some(updated_at),
-                    raw: Some(format!("{:?}", latest.execution)),
-                },
-            )
-            .await?;
+        let fills = execs
+            .iter()
+            .zip(&times)
+            .map(|(d, executed_at)| NewFill {
+                broker_fill_id: d.execution.execution_id.clone(),
+                quantity: d.execution.shares,
+                price: d.execution.price,
+                // Commission currency is taken as USD, like the position values.
+                fee_usd: commissions
+                    .get(&d.execution.execution_id)
+                    .map_or(0.0, |c| c.commission),
+                executed_at: *executed_at,
+            })
+            .collect();
 
-        for (d, executed_at) in execs.iter().zip(&times) {
-            // Commission currency is taken as USD, like the position values.
-            let fee_usd = commissions
-                .get(&d.execution.execution_id)
-                .map_or(0.0, |c| c.commission);
-            let new = db
-                .insert_fill(
-                    order_id,
-                    &NewFill {
-                        broker_fill_id: d.execution.execution_id.clone(),
-                        quantity: d.execution.shares,
-                        price: d.execution.price,
-                        fee_usd,
-                        executed_at: *executed_at,
-                    },
-                )
-                .await?;
-            new_fills += u64::from(new);
-        }
-        db.refresh_order_fees(order_id).await?;
+        batches.push(ExecutionBatch {
+            instrument: instrument(&first.contract),
+            broker_instrument_id: first.contract.contract_id.to_string(),
+            order: NewOrder {
+                instrument_id: 0, // resolved by the store from `instrument`
+                broker_order_id: key,
+                side: match first.execution.side {
+                    ExecutionSide::Bought => OrderSide::Buy,
+                    ExecutionSide::Sold => OrderSide::Sell,
+                },
+                order_type: OrderType::Other,
+                time_in_force: None,
+                quantity: latest.execution.cumulative_quantity,
+                limit_price: None,
+                stop_price: None,
+                filled_quantity: latest.execution.cumulative_quantity,
+                avg_fill_price: Some(latest.execution.average_price),
+                fees_usd: 0.0, // summed from the fills by the store
+                status: OrderStatus::Filled,
+                placed_at,
+                updated_at,
+                closed_at: Some(updated_at),
+                raw: Some(format!("{:?}", latest.execution)),
+            },
+            fills,
+        });
     }
-    Ok(new_fills)
+    Ok(batches)
 }
 
 /// `orders.broker_order_id` for an execution: the permId, or for trades from

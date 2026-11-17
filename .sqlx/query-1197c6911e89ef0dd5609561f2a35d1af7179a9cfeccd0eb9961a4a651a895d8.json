@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE orders\n        SET fees_usd = (SELECT COALESCE(SUM(fee_usd), 0) FROM fills WHERE order_id = ?1)\n        WHERE id = ?1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1197c6911e89ef0dd5609561f2a35d1af7179a9cfeccd0eb9961a4a651a895d8"
+}

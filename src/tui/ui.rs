@@ -72,7 +72,19 @@ fn draw_status(frame: &mut Frame, area: Rect, app: &App) {
     let mut spans = vec![Span::raw("r=reload, s=sync, q=quit")];
     if !app.syncing.is_empty() {
         spans.push(Span::raw("  |  "));
-        spans.push(Span::raw("Syncing brokers...").dim());
+        let target = match &app.remote {
+            Some(host) => format!("Syncing brokers -> {host}..."),
+            None => "Syncing brokers...".into(),
+        };
+        spans.push(Span::raw(target).dim());
+    } else if let (Some(host), true) = (&app.remote, app.synced_remotely) {
+        spans.push(Span::raw("  |  "));
+        spans.push(
+            Span::raw(format!(
+                "Synced to {host}; this view shows the local database"
+            ))
+            .dim(),
+        );
     }
     if let Some(e) = &app.error {
         spans.push(Span::raw("  |  "));

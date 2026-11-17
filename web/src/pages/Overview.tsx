@@ -81,7 +81,7 @@ export function Overview() {
             </tbody>
           </table></div>
           <p className="muted" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
-            The server only reads the database. Run <code className="mono">kgbctl -c sync</code> to refresh broker data; this page reloads every 30s.
+            The server never contacts a broker. Refresh broker data from the machine that holds the credentials with <code className="mono">kgbctl -c sync --remote</code>; this page reloads every 30s.
           </p>
         </Card>
         <Card title="Allocation by broker">

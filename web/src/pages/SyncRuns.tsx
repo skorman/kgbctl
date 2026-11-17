@@ -19,7 +19,7 @@ export function SyncRuns() {
 
   return (
     <div>
-      <div className="page-head"><div><h1>Sync runs</h1><p>Every broker sync attempt, newest first. Syncs run from the CLI; the server only records them.</p></div></div>
+      <div className="page-head"><div><h1>Sync runs</h1><p>Every broker sync attempt, newest first. Syncs run where the broker credentials live and push their data here with <code className="mono">kgbctl -c sync --remote</code>.</p></div></div>
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
         <div className="card"><Stat small label="Runs shown" value={data.length} delta={`${ok} ok · ${failed} failed`} /></div>
         <div className="card"><Stat small label="Success rate" value={data.length ? `${Math.round((ok / data.length) * 100)}%` : "—"} tone={failed > ok ? "bad" : "good"} /></div>
@@ -40,7 +40,7 @@ export function SyncRuns() {
       {runs.isPending ? <Loading text="Loading runs…" /> : (
         <Card className={runs.isFetching ? "chart-fade" : ""}>
           <div className="table-wrap"><table className="data">
-            <thead><tr><th>#</th><th className="left">Broker</th><th className="left">Status</th><th className="left">Started</th><th>Duration</th><th className="left">Error</th></tr></thead>
+            <thead><tr><th>#</th><th className="left">Broker</th><th className="left">Status</th><th className="left">Started</th><th>Duration</th><th className="left">Pushed by</th><th className="left">Error</th></tr></thead>
             <tbody>
               {data.map((r) => (
                 <tr key={r.id}>
@@ -49,10 +49,11 @@ export function SyncRuns() {
                   <td className="left"><span className={`pill ${r.status === "ok" ? "good" : r.status === "error" ? "bad" : "warn"}`}>{r.status === "ok" ? "✓" : r.status === "error" ? "✕" : "◌"} {titleCase(r.status)}</span></td>
                   <td className="left" title={r.started_at}>{dateTime(r.started_at)} <span className="muted">({ago(r.started_at)})</span></td>
                   <td className="num">{duration(r.started_at, r.finished_at)}</td>
+                  <td className="left">{r.pushed_by ?? <span className="muted">server</span>}</td>
                   <td className="left" style={{ whiteSpace: "normal", maxWidth: 520 }}>{r.error ? <span className="bad">{r.error}</span> : <span className="muted">—</span>}</td>
                 </tr>
               ))}
-              {data.length === 0 && <tr><td colSpan={6} className="empty">No sync runs yet</td></tr>}
+              {data.length === 0 && <tr><td colSpan={7} className="empty">No sync runs yet</td></tr>}
             </tbody>
           </table></div>
         </Card>

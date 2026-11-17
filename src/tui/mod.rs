@@ -1,5 +1,7 @@
-//! Positions dashboard, read from the database. A port of `poc/kgbpoc.py`,
-//! except that brokers are only contacted when a sync is asked for (`s`).
+//! Positions dashboard, read from the local database. A port of `poc/kgbpoc.py`,
+//! except that brokers are only contacted when a sync is asked for (`s`). The
+//! sync writes to `store`, which may be a remote server; the dashboard itself
+//! always shows the local database.
 
 mod app;
 mod format;
@@ -12,15 +14,15 @@ use ratatui::crossterm::event::{self, Event};
 use tokio::sync::mpsc;
 
 use crate::db::{Broker, Db};
-use crate::sync::{self, SyncOptions, SyncReport};
+use crate::sync::{self, Store, SyncOptions, SyncReport};
 use app::{Action, App};
 use splash::Splash;
 
 const TICK: Duration = Duration::from_millis(100);
 
-pub async fn run(db: Db, sync_config: sync::Config) -> anyhow::Result<()> {
+pub async fn run(db: Db, store: Store, sync_config: sync::Config) -> anyhow::Result<()> {
     let mut terminal = ratatui::init();
-    let result = event_loop(&mut terminal, db, sync_config).await;
+    let result = event_loop(&mut terminal, db, store, sync_config).await;
     ratatui::restore();
     result
 }
@@ -28,6 +30,7 @@ pub async fn run(db: Db, sync_config: sync::Config) -> anyhow::Result<()> {
 async fn event_loop(
     terminal: &mut ratatui::DefaultTerminal,
     db: Db,
+    store: Store,
     sync_config: sync::Config,
 ) -> anyhow::Result<()> {
     // crossterm's blocking reader lives on its own thread; the loop below only awaits.
@@ -43,7 +46,7 @@ async fn event_loop(
     let (sync_tx, mut synced) =
         mpsc::unbounded_channel::<Vec<(Broker, anyhow::Result<SyncReport>)>>();
     let mut ticker = tokio::time::interval(TICK);
-    let mut app = App::new();
+    let mut app = App::new(store.is_remote().then(|| store.describe()));
     app.splash = Splash::new().ok();
     terminal.draw(|f| ui::draw(f, &mut app))?;
     app.reload(&db).await;
@@ -59,11 +62,11 @@ async fn event_loop(
                     Action::Reload => app.reload(&db).await,
                     Action::Sync => {
                         if app.start_sync() {
-                            let (db, config, tx) = (db.clone(), sync_config.clone(), sync_tx.clone());
+                            let (store, config, tx) = (store.clone(), sync_config.clone(), sync_tx.clone());
                             tokio::spawn(async move {
                                 let brokers = [Broker::Ibkr, Broker::Kraken];
                                 let results =
-                                    sync::run_all(&db, &brokers, &config, SyncOptions::default()).await;
+                                    sync::run_all(&store, &brokers, &config, SyncOptions::default()).await;
                                 let _ = tx.send(results);
                             });
                         }
