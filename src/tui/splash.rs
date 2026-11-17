@@ -33,7 +33,9 @@ impl Splash {
                 (f.into_buffer(), delay)
             })
             .collect::<Vec<_>>();
-        let bg = frames.first().map_or(Color::Reset, |(img, _)| corner_average(img));
+        let bg = frames
+            .first()
+            .map_or(Color::Reset, |(img, _)| corner_average(img));
         Ok(Self {
             frames,
             started: Instant::now(),

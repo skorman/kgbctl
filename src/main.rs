@@ -1,9 +1,12 @@
+mod api;
 // Most of the adapter isn't wired to commands yet.
 #[allow(dead_code)]
 mod db;
+mod portfolio;
 mod sync;
 mod tui;
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
@@ -19,6 +22,7 @@ enum Command {
     Returns,
     Sync,
     Tui,
+    Serve,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
@@ -74,6 +78,18 @@ struct CliArgs {
 
     #[arg(long, env = "IBKR_CLIENT_ID", default_value_t = 19)]
     ibkr_client_id: i32,
+
+    // API server address
+    #[arg(long, env = "KGB_BIND", default_value = "0.0.0.0:8080")]
+    bind: SocketAddr,
+
+    // Require `Authorization: Bearer <token>` on API requests
+    #[arg(long, env = "KGB_API_TOKEN", hide_env_values = true)]
+    api_token: Option<String>,
+
+    // Allowed CORS origin; repeat for several (default: any)
+    #[arg(long)]
+    cors_origin: Vec<String>,
 }
 
 fn sync_config(args: &CliArgs) -> Config {
@@ -135,6 +151,14 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Command::Tui => tui::run(db, sync_config(&args)).await?,
+        Command::Serve => {
+            let config = api::ServeConfig {
+                bind: args.bind,
+                token: args.api_token.clone().filter(|t| !t.is_empty()),
+                cors_origins: args.cors_origin.clone(),
+            };
+            api::serve(db, config).await?
+        }
     }
 
     Ok(())

@@ -3,15 +3,19 @@
 
 use chrono::{DateTime, Utc};
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    sqlx::Type, serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash,
+)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Broker {
     Ibkr,
     Kraken,
 }
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum AssetClass {
     Stock,
     Etf,
@@ -23,23 +27,26 @@ pub enum AssetClass {
     Other,
 }
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum SyncStatus {
     Running,
     Ok,
     Error,
 }
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum OrderSide {
     Buy,
     Sell,
 }
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum OrderType {
     Market,
     Limit,
@@ -49,8 +56,9 @@ pub enum OrderType {
     Other,
 }
 
-#[derive(sqlx::Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(sqlx::Type, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[sqlx(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum OrderStatus {
     Pending,
     Open,
@@ -61,7 +69,7 @@ pub enum OrderStatus {
     Expired,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct Account {
     pub id: i64,
     pub broker: Broker,
@@ -71,7 +79,7 @@ pub struct Account {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct Instrument {
     pub id: i64,
     pub symbol: String,
@@ -91,7 +99,7 @@ pub struct NewInstrument {
     pub name: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct SyncRun {
     pub id: i64,
     pub broker: Broker,
@@ -118,7 +126,7 @@ pub struct PositionUpdate {
 }
 
 /// A row of `v_positions`: what the TUI positions table shows.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct PositionView {
     pub id: i64,
     pub broker: Broker,
@@ -135,7 +143,19 @@ pub struct PositionView {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// A row of `position_snapshots`: one position's state at one sync.
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub struct PositionSnapshot {
+    pub taken_at: DateTime<Utc>,
+    pub quantity: f64,
+    pub avg_cost: Option<f64>,
+    pub market_price: Option<f64>,
+    pub market_value_usd: Option<f64>,
+    pub unrealized_pl_usd: Option<f64>,
+    pub unrealized_pl_pct: Option<f64>,
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct PositionGroup {
     pub id: i64,
     pub name: String,

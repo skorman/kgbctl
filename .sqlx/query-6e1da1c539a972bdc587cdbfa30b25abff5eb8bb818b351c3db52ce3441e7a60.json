@@ -1,0 +1,170 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id AS \"id!\", broker AS \"broker!: Broker\", account AS \"account!\",\n                   ticker AS \"ticker!\", asset_class AS \"asset_class!: AssetClass\",\n                   quantity AS \"quantity!\", market_price, market_value_usd, avg_cost,\n                   cost_basis_usd, unrealized_pl_usd, unrealized_pl_pct,\n                   updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM v_positions\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "broker!: Broker",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "broker"
+          }
+        }
+      },
+      {
+        "name": "account!",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "external_id"
+          }
+        }
+      },
+      {
+        "name": "ticker!",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "symbol"
+          }
+        }
+      },
+      {
+        "name": "asset_class!: AssetClass",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "instruments",
+            "name": "asset_class"
+          }
+        }
+      },
+      {
+        "name": "quantity!",
+        "ordinal": 5,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "name": "market_price",
+        "ordinal": 6,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "market_price"
+          }
+        }
+      },
+      {
+        "name": "market_value_usd",
+        "ordinal": 7,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "market_value_usd"
+          }
+        }
+      },
+      {
+        "name": "avg_cost",
+        "ordinal": 8,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "avg_cost"
+          }
+        }
+      },
+      {
+        "name": "cost_basis_usd",
+        "ordinal": 9,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "cost_basis_usd"
+          }
+        }
+      },
+      {
+        "name": "unrealized_pl_usd",
+        "ordinal": 10,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "unrealized_pl_usd"
+          }
+        }
+      },
+      {
+        "name": "unrealized_pl_pct",
+        "ordinal": 11,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "unrealized_pl_pct"
+          }
+        }
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "positions",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "6e1da1c539a972bdc587cdbfa30b25abff5eb8bb818b351c3db52ce3441e7a60"
+}

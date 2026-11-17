@@ -1,4 +1,4 @@
-//! Kraken positions and cost basis, ported from `poc/kraken.py`.
+//! Kraken positions and cost basis.
 //!
 //! The API key only needs "Query Funds" plus "Query open orders & trades".
 //! Cost basis comes from replaying the ledger. The ledger is stored raw in

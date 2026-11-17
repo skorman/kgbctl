@@ -1,0 +1,31 @@
+# Read-only kgbctl API on the Raspberry Pi.
+#
+#   sudo useradd --system --home /var/lib/kgbctl --shell /usr/sbin/nologin kgbctl
+#   sudo install -d -o kgbctl -g kgbctl /var/lib/kgbctl
+#   sudo install -m 755 kgbctl /usr/local/bin/kgbctl
+#   sudo install -m 644 deploy/kgbctl.service /etc/systemd/system/
+#   echo 'KGB_API_TOKEN=...' | sudo tee /etc/kgbctl.env && sudo chmod 600 /etc/kgbctl.env
+#   sudo systemctl daemon-reload && sudo systemctl enable --now kgbctl
+
+[Unit]
+Description=kgbctl API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=kgbctl
+Group=kgbctl
+EnvironmentFile=-/etc/kgbctl.env
+ExecStart=/usr/local/bin/kgbctl -c serve --db /var/lib/kgbctl/kgb.db
+Restart=on-failure
+RestartSec=5
+
+# The database (and its WAL files) is the only thing it writes.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/kgbctl
+
+[Install]
+WantedBy=multi-user.target

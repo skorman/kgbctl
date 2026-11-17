@@ -2,7 +2,6 @@
 //! except that brokers are only contacted when a sync is asked for (`s`).
 
 mod app;
-mod data;
 mod format;
 mod splash;
 mod ui;

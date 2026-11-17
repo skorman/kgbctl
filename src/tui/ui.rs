@@ -9,9 +9,9 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Cell, Paragraph, Row, Table, Tabs};
 
 use super::app::{App, View};
-use super::data::{Source, Tab, Totals};
 use super::format::{grouped, money, pct, price_str, signed_money, signed_pct};
 use crate::db::SyncStatus;
+use crate::portfolio::{Source, Tab, Totals};
 
 const PRIMARY: Color = Color::Blue;
 const ZEBRA: Color = Color::Indexed(236);

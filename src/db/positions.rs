@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqliteConnection;
 
-use super::{AssetClass, Broker, Db, PositionUpdate, PositionView, instruments, ts};
+use super::{
+    AssetClass, Broker, Db, PositionSnapshot, PositionUpdate, PositionView, instruments, ts,
+};
 
 impl Db {
     /// Write one broker's full position report for `account_id`, atomically:
@@ -43,6 +45,54 @@ impl Db {
             FROM v_positions
             ORDER BY broker, account, ticker
             "#
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// One open position (`v_positions`), or `None` if it's closed or unknown.
+    pub async fn position(&self, id: i64) -> sqlx::Result<Option<PositionView>> {
+        sqlx::query_as!(
+            PositionView,
+            r#"
+            SELECT id AS "id!", broker AS "broker!: Broker", account AS "account!",
+                   ticker AS "ticker!", asset_class AS "asset_class!: AssetClass",
+                   quantity AS "quantity!", market_price, market_value_usd, avg_cost,
+                   cost_basis_usd, unrealized_pl_usd, unrealized_pl_pct,
+                   updated_at AS "updated_at!: DateTime<Utc>"
+            FROM v_positions
+            WHERE id = ?
+            "#,
+            id,
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Snapshots of one position, oldest first, optionally bounded by `from`/`to`
+    /// (inclusive).
+    pub async fn position_history(
+        &self,
+        position_id: i64,
+        from: Option<DateTime<Utc>>,
+        to: Option<DateTime<Utc>>,
+    ) -> sqlx::Result<Vec<PositionSnapshot>> {
+        let from = from.map(ts);
+        let to = to.map(ts);
+        sqlx::query_as!(
+            PositionSnapshot,
+            r#"
+            SELECT taken_at AS "taken_at: DateTime<Utc>", quantity, avg_cost, market_price,
+                   market_value_usd, unrealized_pl_usd, unrealized_pl_pct
+            FROM position_snapshots
+            WHERE position_id = ?1
+              AND (?2 IS NULL OR taken_at >= ?2)
+              AND (?3 IS NULL OR taken_at <= ?3)
+            ORDER BY taken_at, id
+            "#,
+            position_id,
+            from,
+            to,
         )
         .fetch_all(&self.pool)
         .await
@@ -217,6 +267,38 @@ mod tests {
             count(&db, "SELECT COUNT(*) FROM position_snapshots").await,
             2
         );
+    }
+
+    #[tokio::test]
+    async fn position_history_is_oldest_first_and_bounded() {
+        let db = Db::connect_in_memory().await.unwrap();
+        let account = db
+            .upsert_account(Broker::Ibkr, "U1", None, "USD")
+            .await
+            .unwrap();
+
+        for price in [100.0, 110.0, 120.0] {
+            sync(&db, account, &[stock("NVDA", "1", 10.0, price, 80.0)]).await;
+        }
+
+        let id = db.list_positions().await.unwrap()[0].id;
+        assert_eq!(db.position(id).await.unwrap().unwrap().ticker, "NVDA");
+        assert!(db.position(id + 1).await.unwrap().is_none());
+
+        let all = db.position_history(id, None, None).await.unwrap();
+        let prices: Vec<_> = all.iter().map(|s| s.market_price.unwrap()).collect();
+        assert_eq!(prices, [100.0, 110.0, 120.0]);
+
+        let later = db
+            .position_history(id, Some(all[1].taken_at), None)
+            .await
+            .unwrap();
+        assert_eq!(later.len(), 2);
+        let earlier = db
+            .position_history(id, None, Some(all[0].taken_at))
+            .await
+            .unwrap();
+        assert_eq!(earlier.len(), 1);
     }
 
     #[tokio::test]

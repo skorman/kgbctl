@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, broker AS \"broker: Broker\",\n                   started_at AS \"started_at: DateTime<Utc>\",\n                   finished_at AS \"finished_at: DateTime<Utc>\",\n                   status AS \"status: SyncStatus\", error\n            FROM sync_runs\n            WHERE ?1 IS NULL OR broker = ?1\n            ORDER BY id DESC\n            LIMIT ?2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "broker: Broker",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "broker"
+          }
+        }
+      },
+      {
+        "name": "started_at: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "name": "finished_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "finished_at"
+          }
+        }
+      },
+      {
+        "name": "status: SyncStatus",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "error",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "sync_runs",
+            "name": "error"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "ff077fefbf37ea5e807a4eee04059d0f5d348e45b74ce57ff7013dc733dd08b7"
+}

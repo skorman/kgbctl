@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT taken_at AS \"taken_at: DateTime<Utc>\", quantity, avg_cost, market_price,\n                   market_value_usd, unrealized_pl_usd, unrealized_pl_pct\n            FROM position_snapshots\n            WHERE position_id = ?1\n              AND (?2 IS NULL OR taken_at >= ?2)\n              AND (?3 IS NULL OR taken_at <= ?3)\n            ORDER BY taken_at, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "taken_at: DateTime<Utc>",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "taken_at"
+          }
+        }
+      },
+      {
+        "name": "quantity",
+        "ordinal": 1,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "name": "avg_cost",
+        "ordinal": 2,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "avg_cost"
+          }
+        }
+      },
+      {
+        "name": "market_price",
+        "ordinal": 3,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "market_price"
+          }
+        }
+      },
+      {
+        "name": "market_value_usd",
+        "ordinal": 4,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "market_value_usd"
+          }
+        }
+      },
+      {
+        "name": "unrealized_pl_usd",
+        "ordinal": 5,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "unrealized_pl_usd"
+          }
+        }
+      },
+      {
+        "name": "unrealized_pl_pct",
+        "ordinal": 6,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "position_snapshots",
+            "name": "unrealized_pl_pct"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "fafbfd5b0e63b8698422d74929b743fe907483a6e6a1c39a90e1a36f2da87a0d"
+}

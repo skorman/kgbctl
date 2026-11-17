@@ -1,5 +1,4 @@
-//! IBKR positions and executions via the TWS socket API, ported from
-//! `poc/kgbpoc.py::fetch_holdings` and `poc/positions.py`.
+//! IBKR positions and executions via the TWS socket API.
 //!
 //! TWS must be running with the socket API enabled. Keep "Read-Only API" checked
 //! in TWS: this module only reads. Positions are a full snapshot each sync.

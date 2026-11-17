@@ -62,6 +62,31 @@ impl Db {
         .fetch_optional(&self.pool)
         .await
     }
+
+    /// Recent sync attempts, newest first, for one broker or all.
+    pub async fn list_sync_runs(
+        &self,
+        broker: Option<Broker>,
+        limit: i64,
+    ) -> sqlx::Result<Vec<SyncRun>> {
+        sqlx::query_as!(
+            SyncRun,
+            r#"
+            SELECT id, broker AS "broker: Broker",
+                   started_at AS "started_at: DateTime<Utc>",
+                   finished_at AS "finished_at: DateTime<Utc>",
+                   status AS "status: SyncStatus", error
+            FROM sync_runs
+            WHERE ?1 IS NULL OR broker = ?1
+            ORDER BY id DESC
+            LIMIT ?2
+            "#,
+            broker,
+            limit,
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
 }
 
 #[cfg(test)]
@@ -84,5 +109,24 @@ mod tests {
         assert!(run.finished_at.is_some());
 
         assert!(db.last_sync_run(Broker::Ibkr).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn list_sync_runs_filters_and_limits() {
+        let db = Db::connect_in_memory().await.unwrap();
+        let k1 = db.start_sync_run(Broker::Kraken).await.unwrap();
+        let i1 = db.start_sync_run(Broker::Ibkr).await.unwrap();
+        let k2 = db.start_sync_run(Broker::Kraken).await.unwrap();
+
+        let ids = |runs: Vec<SyncRun>| runs.into_iter().map(|r| r.id).collect::<Vec<_>>();
+        assert_eq!(
+            ids(db.list_sync_runs(None, 10).await.unwrap()),
+            [k2, i1, k1]
+        );
+        assert_eq!(
+            ids(db.list_sync_runs(Some(Broker::Kraken), 10).await.unwrap()),
+            [k2, k1]
+        );
+        assert_eq!(ids(db.list_sync_runs(None, 1).await.unwrap()), [k2]);
     }
 }

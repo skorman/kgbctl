@@ -4,9 +4,9 @@ use std::time::{Duration, Instant};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::widgets::TableState;
 
-use super::data::{BROKERS, Snapshot};
 use super::splash::Splash;
 use crate::db::{Broker, Db};
+use crate::portfolio::{BROKERS, Snapshot};
 use crate::sync::SyncReport;
 
 /// Reload from the database this often, so syncs run outside the TUI show up.

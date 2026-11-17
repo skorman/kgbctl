@@ -74,6 +74,12 @@ impl Db {
         sqlx::migrate!("./migrations").run(&self.pool).await?;
         Ok(())
     }
+
+    /// Cheap round trip, for health checks.
+    pub async fn ping(&self) -> sqlx::Result<()> {
+        sqlx::query("SELECT 1").execute(&self.pool).await?;
+        Ok(())
+    }
 }
 
 /// Format a timestamp the same way the schema's `strftime('%Y-%m-%dT%H:%M:%fZ')`
