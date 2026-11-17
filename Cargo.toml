@@ -12,6 +12,7 @@ chrono-tz = "0.10.4"
 clap = { version = "4.6.1", features = ["derive", "env"] }
 form_urlencoded = "1.2.2"
 futures = "0.3.34"
+getrandom = "0.3"
 hmac = "0.13.0"
 ibapi = "5.7.0"
 image = { version = "0.25.10", default-features = false, features = ["gif"] }

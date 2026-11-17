@@ -79,6 +79,15 @@ pub struct Account {
     pub created_at: DateTime<Utc>,
 }
 
+/// Someone allowed to call the API. The token itself is never loaded.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ApiUser {
+    pub id: i64,
+    pub name: String,
+    pub created_at: DateTime<Utc>,
+    pub last_active_at: Option<DateTime<Utc>>,
+}
+
 #[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct Instrument {
     pub id: i64,

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE api_users SET last_active_at = ?\n            WHERE token_hash = ?\n            RETURNING id, name, created_at AS \"created_at: DateTime<Utc>\",\n                      last_active_at AS \"last_active_at: DateTime<Utc>\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "api_users",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_users",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_users",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "last_active_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "api_users",
+            "name": "last_active_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9919ff84fcf630026d1e1e85cc7dc1c2b325886ec11e535f95523e83a242fff9"
+}

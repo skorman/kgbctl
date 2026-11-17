@@ -4,7 +4,8 @@
 #   sudo install -d -o kgbctl -g kgbctl /var/lib/kgbctl
 #   sudo install -m 755 kgbctl /usr/local/bin/kgbctl
 #   sudo install -m 644 deploy/kgbctl.service /etc/systemd/system/
-#   echo 'KGB_API_TOKEN=...' | sudo tee /etc/kgbctl.env && sudo chmod 600 /etc/kgbctl.env
+#   # Optional overrides (KGB_BIND, RUST_LOG, ...):
+#   sudo touch /etc/kgbctl.env && sudo chmod 600 /etc/kgbctl.env
 #   sudo systemctl daemon-reload && sudo systemctl enable --now kgbctl
 
 [Unit]

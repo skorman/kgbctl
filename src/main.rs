@@ -23,6 +23,10 @@ enum Command {
     Sync,
     Tui,
     Serve,
+    UserAdd,
+    UserList,
+    UserRotate,
+    UserRemove,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
@@ -83,9 +87,9 @@ struct CliArgs {
     #[arg(long, env = "KGB_BIND", default_value = "0.0.0.0:8080")]
     bind: SocketAddr,
 
-    // Require `Authorization: Bearer <token>` on API requests
-    #[arg(long, env = "KGB_API_TOKEN", hide_env_values = true)]
-    api_token: Option<String>,
+    // API user for user-add / user-rotate / user-remove
+    #[arg(long)]
+    name: Option<String>,
 
     // Allowed CORS origin; repeat for several (default: any)
     #[arg(long)]
@@ -105,6 +109,18 @@ fn sync_config(args: &CliArgs) -> Config {
             client_id: args.ibkr_client_id,
         },
     }
+}
+
+fn user_name(args: &CliArgs) -> anyhow::Result<&str> {
+    args.name
+        .as_deref()
+        .filter(|n| !n.trim().is_empty())
+        .ok_or_else(|| anyhow::anyhow!("--name is required"))
+}
+
+/// The plaintext token exists only here; the database keeps its hash.
+fn print_token(name: &str, token: &str) {
+    println!("Token for {name} (shown once, store it now):\n{token}");
 }
 
 #[tokio::main]
@@ -154,10 +170,48 @@ async fn main() -> anyhow::Result<()> {
         Command::Serve => {
             let config = api::ServeConfig {
                 bind: args.bind,
-                token: args.api_token.clone().filter(|t| !t.is_empty()),
                 cors_origins: args.cors_origin.clone(),
             };
             api::serve(db, config).await?
+        }
+        Command::UserAdd => {
+            let name = user_name(&args)?;
+            let token = api::token::generate()?;
+            db.create_api_user(name, &api::token::hash(&token))
+                .await
+                .map_err(|e| match e.as_database_error() {
+                    Some(d) if d.is_unique_violation() => {
+                        anyhow::anyhow!("a user named {name:?} already exists")
+                    }
+                    _ => e.into(),
+                })?;
+            print_token(name, &token);
+        }
+        Command::UserList => {
+            for u in db.list_api_users().await? {
+                let last = u.last_active_at.map_or("never".into(), |t| {
+                    t.format("%Y-%m-%d %H:%M UTC").to_string()
+                });
+                println!("{:<16} last active {last}", u.name);
+            }
+        }
+        Command::UserRotate => {
+            let name = user_name(&args)?;
+            let token = api::token::generate()?;
+            if !db
+                .set_api_user_token(name, &api::token::hash(&token))
+                .await?
+            {
+                anyhow::bail!("no user named {name:?}");
+            }
+            print_token(name, &token);
+        }
+        Command::UserRemove => {
+            let name = user_name(&args)?;
+            if !db.delete_api_user(name).await? {
+                anyhow::bail!("no user named {name:?}");
+            }
+            println!("Removed {name}.");
         }
     }
 

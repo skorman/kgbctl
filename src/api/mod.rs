@@ -5,18 +5,20 @@ mod auth;
 mod dto;
 mod error;
 mod routes;
+pub mod token;
 
 use std::io::IsTerminal;
 use std::net::SocketAddr;
 
 use anyhow::Context;
 use axum::Router;
+use axum::extract::Request;
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
 use axum::http::{HeaderValue, Method};
 use axum::middleware;
 use axum::routing::get;
 use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 use crate::db::Db;
@@ -24,20 +26,19 @@ use crate::db::Db;
 #[derive(Clone)]
 pub struct AppState {
     db: Db,
-    /// When set, every route but `/health` needs `Authorization: Bearer <token>`.
-    token: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ServeConfig {
     pub bind: SocketAddr,
-    pub token: Option<String>,
     /// Allowed CORS origins; empty allows any.
     pub cors_origins: Vec<String>,
 }
 
-pub fn router(db: Db, token: Option<String>) -> Router {
-    let state = AppState { db, token };
+/// Every route but `/health` needs `Authorization: Bearer <token>` for a user in
+/// `api_users`.
+pub fn router(db: Db) -> Router {
+    let state = AppState { db };
 
     let protected = Router::new()
         .route("/snapshot", get(routes::snapshot))
@@ -53,7 +54,7 @@ pub fn router(db: Db, token: Option<String>) -> Router {
         .route("/sync/runs", get(routes::sync_runs))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
-            auth::require_token,
+            auth::require_user,
         ));
 
     let api = Router::new()
@@ -89,17 +90,23 @@ pub async fn serve(db: Db, config: ServeConfig) -> anyhow::Result<()> {
         )
         .init();
 
-    if config.token.is_none() {
-        tracing::warn!("KGB_API_TOKEN is not set; the API is open to anyone who can reach it");
+    if db.list_api_users().await?.is_empty() {
+        tracing::warn!("no API users; add one with `kgbctl -c user-add --name <name>`");
     }
 
-    let app = router(db, config.token)
-        .layer(cors(&config.cors_origins)?)
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                .on_response(DefaultOnResponse::new().level(Level::INFO)),
-        );
+    let app = router(db).layer(cors(&config.cors_origins)?).layer(
+        TraceLayer::new_for_http()
+            // `user` is filled in by `auth::require_user` once the token checks out.
+            .make_span_with(|req: &Request| {
+                tracing::info_span!(
+                    "request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                    user = tracing::field::Empty,
+                )
+            })
+            .on_response(DefaultOnResponse::new().level(Level::INFO)),
+    );
 
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
@@ -209,6 +216,15 @@ mod tests {
         db
     }
 
+    /// A router over `db` with one user, and that user's token.
+    async fn authed(db: Db) -> (Router, String) {
+        let token = token::generate().unwrap();
+        db.create_api_user("Tester", &token::hash(&token))
+            .await
+            .unwrap();
+        (router(db), token)
+    }
+
     async fn get(app: &Router, uri: &str, token: Option<&str>) -> (StatusCode, Value) {
         let mut req = Request::get(uri);
         if let Some(t) = token {
@@ -228,9 +244,9 @@ mod tests {
     async fn snapshot_matches_what_the_tui_loads() {
         let db = seeded().await;
         let expected = Snapshot::load(&db).await.unwrap();
-        let app = router(db, None);
+        let (app, token) = authed(db).await;
 
-        let (status, body) = get(&app, "/api/v1/snapshot", None).await;
+        let (status, body) = get(&app, "/api/v1/snapshot", Some(&token)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["totals"]["value"], expected.totals.value);
         assert_eq!(body["totals"]["basis"], expected.totals.basis);
@@ -249,18 +265,18 @@ mod tests {
 
     #[tokio::test]
     async fn tab_lookup_is_case_insensitive() {
-        let app = router(seeded().await, None);
+        let (app, token) = authed(seeded().await).await;
 
-        let (status, body) = get(&app, "/api/v1/tabs/crypto", None).await;
+        let (status, body) = get(&app, "/api/v1/tabs/crypto", Some(&token)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["name"], "Crypto");
         assert_eq!(body["holdings"][0]["ticker"], "BTC");
 
-        let (status, body) = get(&app, "/api/v1/tabs/nope", None).await;
+        let (status, body) = get(&app, "/api/v1/tabs/nope", Some(&token)).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["error"]["code"], "not_found");
 
-        let (_, body) = get(&app, "/api/v1/tabs", None).await;
+        let (_, body) = get(&app, "/api/v1/tabs", Some(&token)).await;
         assert_eq!(body[2]["name"], "Prometheus");
         assert_eq!(body[2]["holding_count"], 1);
     }
@@ -278,9 +294,9 @@ mod tests {
             ],
         )
         .await;
-        let app = router(db, None);
+        let (app, token) = authed(db).await;
 
-        let (_, body) = get(&app, "/api/v1/positions?broker=kraken", None).await;
+        let (_, body) = get(&app, "/api/v1/positions?broker=kraken", Some(&token)).await;
         let tickers: Vec<_> = body
             .as_array()
             .unwrap()
@@ -289,7 +305,7 @@ mod tests {
             .collect();
         assert_eq!(tickers, ["BTC"]);
 
-        let (_, body) = get(&app, "/api/v1/positions?account=U1", None).await;
+        let (_, body) = get(&app, "/api/v1/positions?account=U1", Some(&token)).await;
         let nvda = body
             .as_array()
             .unwrap()
@@ -298,7 +314,12 @@ mod tests {
             .unwrap();
         let id = nvda["id"].as_i64().unwrap();
 
-        let (status, body) = get(&app, &format!("/api/v1/positions/{id}/history"), None).await;
+        let (status, body) = get(
+            &app,
+            &format!("/api/v1/positions/{id}/history"),
+            Some(&token),
+        )
+        .await;
         assert_eq!(status, StatusCode::OK);
         let prices: Vec<_> = body
             .as_array()
@@ -311,23 +332,23 @@ mod tests {
         let (status, body) = get(
             &app,
             &format!("/api/v1/positions/{id}/history?from=yesterday"),
-            None,
+            Some(&token),
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["error"]["code"], "bad_request");
 
-        let (status, _) = get(&app, "/api/v1/positions/9999", None).await;
+        let (status, _) = get(&app, "/api/v1/positions/9999", Some(&token)).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
-        let (status, _) = get(&app, "/api/v1/positions?broker=schwab", None).await;
+        let (status, _) = get(&app, "/api/v1/positions?broker=schwab", Some(&token)).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
     async fn groups_include_totals_only_when_held() {
-        let app = router(seeded().await, None);
+        let (app, token) = authed(seeded().await).await;
 
-        let (_, body) = get(&app, "/api/v1/groups", None).await;
+        let (_, body) = get(&app, "/api/v1/groups", Some(&token)).await;
         let prometheus = body
             .as_array()
             .unwrap()
@@ -343,16 +364,16 @@ mod tests {
             .unwrap();
         assert!(ares["totals"].is_null());
 
-        let (status, body) = get(&app, "/api/v1/groups/zeus", None).await;
+        let (status, body) = get(&app, "/api/v1/groups/zeus", Some(&token)).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["members"].as_array().unwrap().len(), 19);
     }
 
     #[tokio::test]
     async fn sync_runs_newest_first_and_limited() {
-        let app = router(seeded().await, None);
+        let (app, token) = authed(seeded().await).await;
 
-        let (_, body) = get(&app, "/api/v1/sync/runs", None).await;
+        let (_, body) = get(&app, "/api/v1/sync/runs", Some(&token)).await;
         let brokers: Vec<_> = body
             .as_array()
             .unwrap()
@@ -361,26 +382,37 @@ mod tests {
             .collect();
         assert_eq!(brokers, ["kraken", "ibkr"]);
 
-        let (_, body) = get(&app, "/api/v1/sync/runs?limit=1&broker=ibkr", None).await;
+        let (_, body) = get(&app, "/api/v1/sync/runs?limit=1&broker=ibkr", Some(&token)).await;
         assert_eq!(body.as_array().unwrap().len(), 1);
         assert_eq!(body[0]["broker"], "ibkr");
     }
 
     #[tokio::test]
-    async fn token_is_required_when_configured() {
-        let app = router(seeded().await, Some("s3cret".into()));
+    async fn requests_need_a_known_users_token() {
+        let db = seeded().await;
+        let (app, token) = authed(db.clone()).await;
 
         let (status, body) = get(&app, "/api/v1/snapshot", None).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert_eq!(body["error"]["code"], "unauthorized");
+        let wrong = token::generate().unwrap();
         assert_eq!(
-            get(&app, "/api/v1/snapshot", Some("wrong")).await.0,
+            get(&app, "/api/v1/snapshot", Some(&wrong)).await.0,
             StatusCode::UNAUTHORIZED
         );
+        assert!(
+            db.list_api_users().await.unwrap()[0]
+                .last_active_at
+                .is_none()
+        );
+
         assert_eq!(
-            get(&app, "/api/v1/snapshot", Some("s3cret")).await.0,
+            get(&app, "/api/v1/snapshot", Some(&token)).await.0,
             StatusCode::OK
         );
+        let user = &db.list_api_users().await.unwrap()[0];
+        assert_eq!(user.name, "Tester");
+        assert!(user.last_active_at.is_some());
 
         let (status, body) = get(&app, "/api/v1/health", None).await;
         assert_eq!(status, StatusCode::OK);

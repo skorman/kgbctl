@@ -69,13 +69,20 @@ A read-only JSON API over the same data the TUI shows. It serves what's in the d
 
 ```sh
 cargo run -- -c serve                          # listens on 0.0.0.0:8080
-KGB_API_TOKEN=secret cargo run -- -c serve     # require a bearer token
+```
+
+Every request except `/health` needs a bearer token belonging to an API user. Each user has their own token, and the request log records which user made each request. Tokens are stored only as SHA-256 hashes, so a token is shown once, when it's issued:
+
+```sh
+cargo run -- -c user-add --name Sam        # prints Sam's token
+cargo run -- -c user-list                  # names and last activity
+cargo run -- -c user-rotate --name Sam     # issue a new token; the old one stops working
+cargo run -- -c user-remove --name Sam
 ```
 
 | Variable / flag | Default | Purpose |
 | --- | --- | --- |
 | `KGB_BIND` / `--bind` | `0.0.0.0:8080` | Listen address |
-| `KGB_API_TOKEN` / `--api-token` | unset (no auth) | Require `Authorization: Bearer <token>` on everything except `/health` |
 | `--cors-origin <url>` | any origin | Restrict browser origins; repeat for several |
 | `RUST_LOG` | `kgbctl=info,tower_http=info` | Log filter |
 
@@ -96,14 +103,14 @@ All endpoints are `GET` under `/api/v1`. Money is in USD; percentages are fracti
 Errors are `{"error": {"code", "message"}}` with status 400, 401, 404 or 500.
 
 ```sh
-curl -H "Authorization: Bearer $KGB_API_TOKEN" localhost:8080/api/v1/snapshot | jq
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/snapshot | jq
 ```
 
 ### Raspberry Pi
 
 Build for 64-bit ARM Linux, either natively on the Pi with `nix build .#packages.aarch64-linux.default`, or cross-compiled with `SQLX_OFFLINE=true cargo zigbuild --release --target aarch64-unknown-linux-gnu`. Then follow the steps at the top of `deploy/kgbctl.service` to install the binary and the systemd unit.
 
-The server doesn't sync yet, so copy the database over. `.backup` makes a consistent copy even while the database is in use:
+The server doesn't sync yet, so copy the database over. `.backup` makes a consistent copy even while the database is in use. The copy replaces the Pi's API users too, so manage users in the local database before copying:
 
 ```sh
 sqlite3 var/kgb.db ".backup /tmp/kgb.db"

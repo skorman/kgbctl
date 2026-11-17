@@ -5,6 +5,7 @@
 //! committed `.sqlx/` cache when `SQLX_OFFLINE=true`.
 
 mod accounts;
+mod api_users;
 mod groups;
 mod instruments;
 mod kraken_ledger;
